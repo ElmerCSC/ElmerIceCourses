@@ -1,0 +1,302 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!                                       !!
+!! Elmer/Ice Course 2011                 !!
+!!                                       !!
+!! Olivier Gagliardini  May 2011         !!
+!!                                       !!
+!! Tete Rousse Step 2a -    cavity       !! 
+!!                                       !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Updated April 2013 to use internal Mesh Extrusion
+! Updated Oct 2014 to use the Grid2dInterpolator solver 
+! Updated Oct 2018 to use LUA language instead of MATC  
+
+check keywords warn
+echo on
+
+!---LUA BEGIN 
+! function TestContact(zb,bed) 
+!   if zb > (bed+0.01) then return -1.0 else return 1.0 end 
+! end 
+!
+! function IfThenElse(condition,t,f) 
+!   if condition then return t else return f end 
+! end 
+!---LUA END 
+
+! Name of output files
+$Step = "step2a_"
+
+! Define the parameter in MPa - a - m
+#yearinsec = 365.25*24*60*60
+#rhoi = 900.0/(1.0e6*yearinsec^2)   
+#rhow = 1000.0/(1.0e6*yearinsec^2) 
+#gravity = -9.81*yearinsec^2
+
+! Prefactor from Cuffey and Paterson (2010) in MPa^{-3} a^{-1}
+#A1 = 2.89165e-13*yearinsec*1.0e18 
+#A2 = 2.42736e-02*yearinsec*1.0e18 
+#Q1 = 60.0e3
+#Q2 = 115.0e3
+
+Header
+  Mesh DB "." "teterousse"
+! Results Directory "results"
+End
+
+Constants
+  Water Density = Real #rhow
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  =  Cartesian 3D 
+  Simulation Type = Steady        
+
+  Extruded Mesh Levels = Integer 16
+
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = 1
+
+  Output File = "teterousse_$Step".result"
+  Post File = "teterousse_$Step".vtu"
+  max output level = 3   
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The ice 
+Body 1
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Pressure = Real 0.0 
+  Velocity 1 = Real 0.0 
+  Velocity 2 = Real 0.0 
+  Velocity 3 = Real 0.0 
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real 0.0
+  Flow BodyForce 3 = Real #gravity 
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  Density = Real #rhoi   
+
+  Viscosity Model = String "glen"
+  Viscosity = 1.0 ! Dummy but avoid warning output
+  Glen Exponent = Real 3.0
+
+  Limit Temperature = Real -10.0
+  Rate Factor 1 = Real #A1
+  Rate Factor 2 = Real #A2
+  Activation Energy 1 = Real #Q1 
+  Activation Energy 2 = Real #Q2  
+  Glen Enhancement Factor = Real 1.0
+  Critical Shear Rate = Real 1.0e-10
+
+  Constant Temperature = Real -1.0
+
+  Cauchy = Logical True 
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 1
+  Exec Solver = "Before Simulation"
+  Equation = "Read DEMs"
+
+  Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
+
+  ! Bedrock DEM
+  Variable 1 = String "bedDEM"
+  Variable 1 data file = File "../Data/DEM_TR_bed.dat"
+  Variable 1 x0 = Real 947700.0d0
+  Variable 1 y0 = Real 2104850.0d0
+  Variable 1 lx = Real 600.0
+  Variable 1 ly = Real 350.0 
+  Variable 1 Nx = Integer 301
+  Variable 1 Ny = Integer 176
+  Variable 1 Invert = Logical False 
+  Variable 1 Fill = Logical False 
+  Variable 1 Position Tol = Real 1.0e-1
+  Variable 1 No Data = Real -9999.0
+  Variable 1 No Data Tol = Real 1.0 
+
+  ! Surface DEM
+  Variable 2 = String "ZsDEM"
+  Variable 2 data file = File "../Data/DEM_TR_surf.dat"
+  Variable 2 x0 = Real 947700.0d0
+  Variable 2 y0 = Real 2104850.0d0
+  Variable 2 lx = Real 800.0
+  Variable 2 ly = Real 350.0 
+  Variable 2 Nx = Integer 268
+  Variable 2 Ny = Integer 118
+  Variable 2 Invert = Logical False 
+  Variable 2 Fill = Logical False 
+  Variable 2 Position Tol = Real 1.0e-1
+  Variable 2 No Data = Real -9999.0
+  Variable 2 No Data Tol = Real 1.0 
+
+  ! Zb DEM (include cavity roof)
+  Variable 3 = String "ZbDEM"
+  Variable 3 data file = File "../Data/DEM_TR_cavity.dat"
+  Variable 3 x0 = Real 947700.0d0
+  Variable 3 y0 = Real 2104850.0d0
+  Variable 3 lx = Real 600.0
+  Variable 3 ly = Real 350.0 
+  Variable 3 Nx = Integer 301
+  Variable 3 Ny = Integer 176
+  Variable 3 Invert = Logical False 
+  Variable 3 Fill = Logical False 
+  Variable 3 Position Tol = Real 1.0e-1
+  Variable 3 No Data = Real -9999.0
+  Variable 3 No Data Tol = Real 1.0 
+End 
+
+
+Solver 2  
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+  Mesh Velocity Variable = String "dSdt"
+  Mesh Update Variable = String "dS"
+  Mesh Velocity First Zero = Logical True
+
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real 1.0
+End
+ 
+Solver 3
+  Equation = "Navier-Stokes"
+  
+  Stabilization Method = String Stabilized
+  Flow Model = Stokes
+
+  Exported Variable 1 = -dofs 1 "dSdt" 
+  Exported Variable 2 = -dofs 1 "dS" 
+  Exported Variable 3 = -dofs 1 "BedDEM"
+  Exported Variable 4 = -dofs 1 "ZsDEM"
+  Exported Variable 5 = -dofs 1 "ZbDEM"
+
+  Linear System Solver = Iterative      
+  Linear System Iterative Method = BICGStab
+   
+  Linear System Preconditioning = ILU0
+  Linear System Convergence Tolerance = Real 1.0e-8
+  Linear System Max Iterations = 500
+  Linear System Residual Output = 500
+  Linear System Abort Not Converged = True 
+
+  Nonlinear System Max Iterations = 50
+  Nonlinear System Convergence Tolerance  = 1.0e-5
+  Nonlinear System Newton After Iterations = 5
+  Nonlinear System Newton After Tolerance = 1.0e-02
+  Nonlinear System Relaxation Factor = 1.00
+
+  Steady State Convergence Tolerance = Real 1.0e-3
+End
+
+Solver 4
+  Equation = "Sij"
+  Procedure = "ElmerIceSolvers" "ComputeDevStress"          
+  Variable = -nooutput "Sij"
+  Variable DOFs = 1
+  Exported Variable 1 = -dofs 6 "Stress"
+  Stress Variable Name = String "Stress"
+  
+  Flow Solver Name = String "Flow Solution"
+
+  Linear System Solver = Direct         
+  Linear System Direct Method = umfpack
+End
+
+Solver 5
+  Equation = "EigenStresses"
+  Procedure = "ElmerIceSolvers" "ComputeEigenValues"
+  Variable = -nooutput dumy
+  Variable DOFs = 1
+  
+  Tensor Variable Name = String "Stress"
+
+  ! The 3 eigenvalues
+  Exported Variable 1 = EigenStress
+  Exported Variable 1 DOFS = 3
+
+  ! The 3 eigenvectors (Option)
+  Exported Variable 2 = EigenVector1
+  Exported Variable 2 DOFS = 3
+  Exported Variable 3 = EigenVector2
+  Exported Variable 3 DOFS =  3
+  Exported Variable 4 = EigenVector3
+  Exported Variable 4 DOFS = 3
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(5) = 1 2 3 4 5
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! lateral side of the glacier 
+Boundary Condition 1
+  Target Boundaries = 1
+  Velocity 1 = real 0.0
+  Velocity 2 = real 0.0
+End
+
+! cavity roof and Bedrock 
+Boundary Condition 2
+  Bottom Surface = Equals ZbDEM   
+
+! --------- No sliding
+  Velocity 1 = Real 0.0
+  Velocity 2 = Real 0.0
+  Velocity 3 = Real 0.0
+
+! LUA solution Option 1
+! Velocity 1 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "(function() if tx[0] > (tx[1] + 0.01) then return -1.0 else return 1.0 end end)()" 
+! Velocity 2 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "(function() if tx[0] > (tx[1] + 0.01) then return -1.0 else return 1.0 end end)()" 
+! Velocity 3 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "(function() if tx[0] > (tx[1] + 0.01) then return -1.0 else return 1.0 end end)()" 
+
+! LUA solution Option 2
+  Velocity 1 Condition = Variable ZbDEM, BedDEM
+    Real LUA "IfThenElse(tx[0] > (tx[1] + 0.01), -1.0, 1.0)" 
+  Velocity 2 Condition = Variable ZbDEM, BedDEM
+    Real LUA "IfThenElse(tx[0] > (tx[1] + 0.01), -1.0, 1.0)" 
+  Velocity 3 Condition = Variable ZbDEM, BedDEM
+    Real LUA "IfThenElse(tx[0] > (tx[1] + 0.01), -1.0, 1.0)" 
+
+! LUA solution Option 3
+! Velocity 1 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "TestContact(tx[0],tx[1])" 
+! Velocity 2 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "TestContact(tx[0],tx[1])" 
+! Velocity 3 Condition = Variable ZbDEM, BedDEM
+!   Real LUA "TestContact(tx[0],tx[1])" 
+
+! F90 User function solution    
+! Velocity 1 Condition = Variable ZbDEM, BedDEM
+!   Real PROCEDURE "../PROG/USF_TR" "MaskCavity"
+! Velocity 2 Condition = Variable ZbDEM, BedDEM
+!   Real PROCEDURE "../PROG/USF_TR" "MaskCavity"
+! Velocity 3 Condition = Variable ZbDEM, BedDEM
+!   Real PROCEDURE "../PROG/USF_TR" "MaskCavity"
+End
+
+! Upper Surface
+Boundary Condition 3
+  Top Surface = Equals ZsDEM
+End
