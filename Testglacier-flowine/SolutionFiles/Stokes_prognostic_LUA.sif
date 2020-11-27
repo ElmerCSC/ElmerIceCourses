@@ -1,0 +1,267 @@
+!echo on
+!---LUA BEGIN
+! -- this is our accumulation rate
+! function accum(X,Z)
+!  if (X > 2500) then
+!    return 0.0
+!  else
+!    return 11.0*Z/2750 - 400.0*11.0/2750.0
+!  end
+!end
+!---LUA END
+
+Header
+  CHECK KEYWORDS Warn
+  Mesh DB "." "testglacier"
+  Include Path ""
+  Results Directory ""
+End
+
+
+Simulation
+  Max Output Level = 4
+  Coordinate System = "Cartesian 2D"
+  Coordinate Mapping(3) = 1 2 3
+  Simulation Type = "Transient"
+  Steady State Max Iterations = 1
+  Timestepping Method = "BDF"
+  BDF Order = 1 
+  Timestep Sizes = 10.0
+  Timestep Intervals =  200
+  Output Intervals = 10
+  !Output File = "Stokes_prognostic_ELA400_SMB.result" 
+  !Post File = "Stokes_prognostic_ELA400_SMB_noflow.vtu"
+  Post File = "Stokes_prognostic_ELA400_SMB_LUA.vtu"	
+  Initialize Dirichlet Conditions = Logical False
+End
+
+Constants
+  Stefan Boltzmann = 5.67e-08
+End
+
+Body 1
+  Name = "Glacier"
+  Body Force = 1
+  Equation = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+Body 2
+  Name = "Surface"
+  Body Force = 2
+  Equation = 2
+  Material = 2
+  Initial Condition = 2
+End
+
+Equation 1
+  Name = "Equation1"
+  Convection = "computed"
+  Flow Solution Name = String "Flow Solution"
+  Active Solvers(3) = 1 2 3
+End
+
+Equation 2
+  Name = "Equation2"
+  !Convection = "none"
+  Convection = "computed" !!! CHANGE TO THIS ONE TO GET REASONABLE RESULTS
+  Active Solvers(1) = 4
+  Flow Solution Name = String "Flow Solution"
+End
+
+Initial Condition 1
+  Velocity 1 = 0.0
+  Velocity 2 = 0.0
+  Pressure = 0.0
+  Mesh Velocity 1 = Real 0.0
+  Mesh Velocity 2 = Real 0.0
+  Mesh Velocity 3 = Real 0.0
+End
+
+Initial Condition 2
+  Zs =   Variable Coordinate 1
+    Real cubic
+     include  "steady_ELA400_bedrock.dat" 
+    End
+  RefZs = Variable Coordinate 1
+    Real cubic
+     include  "steady_ELA400_bedrock.dat" 
+    End
+End
+
+Solver 1
+  Exec Solver = "before timestep"
+  
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 2 ! the mesh-update is y-direction
+
+! For time being this is currently externally allocated
+  Mesh Velocity Variable = String "Mesh Velocity 2"
+
+! The 1st value is special as the mesh velocity could be unrelistically high
+  Mesh Velocity First Zero = Logical True
+
+  Dot Product Tolerance = Real 0.01
+
+! Essential to keep a minimum of 10 m flow height
+  Correct Surface = Logical True
+  Minimum Height = Real 10.0
+End
+
+Solver 2
+  Equation = "HeightDepth"
+  Exec Solver = "Before Timestep"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+  Active Coordinate = Integer 2
+  Operator 1 = depth
+  Operator 2 = height
+End
+
+Solver 3
+  !Exec Solver = "Never" !!! UNCOMMENT TO GET REASONABLE RESULTS
+  Equation = "Navier-Stokes"
+  Optimize Bandwidth = Logical True
+
+
+  Linear System Solver = Direct
+  Linear System Direct Method = "UMFPACK"     
+
+  !Linear System Solver = "Iterative"
+  !Linear System Iterative Method =  "GCR"     !"BICGStab"
+  Linear System Max Iterations = 5000
+  Linear System Convergence Tolerance = 1.0E-08
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU2"
+  Linear System Residual Output = 10
+
+
+  Steady State Convergence Tolerance = 1.0E-03
+!  Stabilization Method = [Stabilized,P2/P1,Bubbles] 
+  Stabilization Method = "Bubbles"
+
+  Nonlinear System Convergence Tolerance = 1.0E-05
+  Nonlinear System Convergence Measure = Solution
+  Nonlinear System Max Iterations = 25 ! 1 try without non-lin iters
+  Nonlinear System Newton After Iterations = 3
+  Nonlinear System Newton After Tolerance =  1.0E-03
+  Nonlinear System Reset Newton = Logical True
+  Exported Variable 1 = -dofs 3 "Mesh Velocity"
+  Exported Variable 2 = -dofs 3 "Mesh Update"
+  !Nonlinear System Relaxation Factor = 0.75
+End
+
+Solver 4
+   Exec Solver = always
+   Equation = "Free Surface"
+   Variable = String "Zs"
+   Variable DOFs =  1
+   ! needed for evaluating the contact pressure
+   Exported Variable 1 = -dofs 1 "Zs Residual"
+   ! needed for storing the initial shape (needed for updates)
+   Exported Variable 2 = -dofs 1 "RefZs"
+   Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
+  ! This would take the contrained points out of solution
+  ! Use in serial run, only
+  ! Before Linsolve = "EliminateDirichlet" "EliminateDirichlet"
+   Linear System Solver = Iterative
+   Linear System Max Iterations = 1500
+   Linear System Iterative Method = BiCGStab
+   Linear System Preconditioning = ILU0
+   Linear System Convergence Tolerance = Real 1.0e-7
+   Linear System Abort Not Converged = False
+   Linear System Residual Output = 1
+   Nonlinear System Max Iterations = 100
+   Nonlinear System Convergence Tolerance  = 1.0e-6
+   Nonlinear System Relaxation Factor = 0.60
+   Steady State Convergence Tolerance = 1.0e-03
+   Stabilization Method = Bubbles
+   ! Apply contact problem    
+   Apply Dirichlet = Logical True 
+End
+
+
+
+
+Material 1
+  Name = "ice"
+  Density = Real $910.0*1.0E-06*(31556926.0)^(-2.0)
+  !----------------
+  ! vicosity stuff (linear)
+  !----------------
+!  Viscosity = Real $1.0E13*(31556926.0)^(-1.0)*1.0E-06
+!  Critical Shear Rate = Real 1.0e-10
+  !--------------------
+  ! vicosity stuff Glen
+  !--------------------
+  Viscosity Model = String "Glen"
+  ! Viscosity has to be set to a dummy value
+  ! to avoid warning output from Elmer
+  Viscosity = Real 1.0 
+  Glen Exponent = Real 3.0
+  Critical Shear Rate = Real 1.0e-10
+  ! Rate factors (Paterson value in MPa^-3a^-1)
+  Rate Factor 1 = Real 1.258e13  
+  Rate Factor 2 = Real 6.046e28
+  ! these are in SI units - no problem, as long as
+  ! the gas constant also is 
+  Activation Energy 1 = Real 60.0e3
+  Activation Energy 2 = Real 139.0e3  
+  Glen Enhancement Factor = Real 1.0
+  ! the temperature to switch between the 
+  ! two regimes in the flow law
+  Limit Temperature = Real -10.0
+  ! In case there is no temperature variable (which applies here)
+  Constant Temperature = Real -3.0
+
+End
+
+Material 2
+  Min Zs = Variable RefZs
+    Real lua "tx[0] - 0.1"
+  Max Zs = Variable RefZs
+    Real lua "tx[0] + 600.0"
+End
+
+Body Force 1
+  Name = "BodyForce1"
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real -9.7696e15  !gravity in MPa - a - m
+  Flow Solution Passive = Variable depth, height
+       Real lua "((tx[0] + tx[1]) < 10.0)"
+End
+
+Body Force 2
+  Name = "Climate"
+  Zs Accumulation Flux 1 = Real 0.0e0
+  Zs Accumulation Flux 2 = Variable Coordinate 1, Coordinate 2
+  Real lua "accum(tx[0],tx[1])" 
+End
+
+Boundary Condition 1
+  Name = "bedrock"
+  Target Boundaries = 1
+  Compute Normals = Logical True
+  Bottom Surface = Equals Coordinate 2 
+  Velocity 1 = Real 0.0e0
+  Velocity 2 = Real 0.0e0
+  Bottom Surface = Variable Coordinate 1
+    Real cubic
+     include  "steady_ELA400_bedrock.dat" 
+    End
+End
+
+Boundary Condition 2
+  Name = "sides"
+  Target Boundaries(2) = 3 4
+  Velocity 1 = Real 0.0e0
+End
+
+Boundary Condition 3
+  Name = "surface"
+  Top Surface = Equals "Zs"
+  Target Boundaries = 2
+  Body ID = 2 !!! THIS IS ESSENTIAL
+End

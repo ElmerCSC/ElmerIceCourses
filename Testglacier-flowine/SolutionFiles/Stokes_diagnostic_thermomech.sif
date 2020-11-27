@@ -1,0 +1,244 @@
+!echo on
+Header
+  !CHECK KEYWORDS Warn
+  Mesh DB "." "testglacier"
+  Include Path ""
+  Results Directory ""
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! MATC stuff
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+$clausclap = 9.8E-08 
+!! conductivity
+$ function conductivity(T)  { _conductivity=9.828*exp(-5.7E-03*T)}
+!! capacity
+$ function capacity(T) { _capacity=146.3+(7.253*T)}
+
+Simulation
+  Max Output Level = 4
+  Coordinate System = "Cartesian 2D"
+  Coordinate Mapping(3) = 1 2 3
+  Simulation Type = "Steady"
+  Steady State Max Iterations = 20
+  Output Intervals = 1
+  Output File = "Stokes_ELA400_diagnostic_thermomech.result"
+  Post File = "Stokes_ELA400_diagnostic_thermomech.vtu" 
+  Initialize Dirichlet Conditions = Logical False
+  ! Restart from previous run
+  Restart File = "Stokes_ELA400_diagnostic_temp_constrained.result"
+  Restart Position = 0
+End
+
+Constants
+  Stefan Boltzmann = 5.67e-08
+End
+
+Body 1
+  Name = "Glacier"
+  Body Force = 1
+  Equation = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+
+Equation 1
+  Name = "Equation1"
+  Convection = "computed"
+  Flow Solution Name = String "Flow Solution"
+  Active Solvers(4) = 1 2 3 4
+End
+
+Initial Condition 1
+  !Velocity 1 = 0.0
+  !Velocity 2 = 0.0
+  !Pressure = 0.0
+  Depth = Real 0.0
+End
+
+! maps DEM's at the very beginning
+! to originally rectangular mesh
+! see Top and Bottom Surface in BC's
+Solver 1
+  Exec Solver = "before Simulation"
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+  Active Coordinate = Integer 2 ! the mesh-update is y-direction
+! For time being this is currently externally allocated
+  Mesh Velocity Variable = String "Mesh Velocity 2"
+! The 1st value is special as the mesh velocity could be unrelistically high
+  Mesh Velocity First Zero = Logical True
+! The accuracy applied to vector-projections
+  Dot Product Tolerance = Real 0.01
+End
+
+! Flow Depth still for postprocessing, only, 
+! now replaced by structured version
+Solver 2
+  Equation = "HeightDepth"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+  Active Coordinate = Integer 2
+  Operator 1 = depth
+  Operator 2 = height
+End
+
+! the central part of the problem: the Stokes solver
+Solver 3
+  ! Exec Solver = "Never" 
+  Equation = "Navier-Stokes"
+  Optimize Bandwidth = Logical True
+  ! direct solver
+  Linear System Solver = Direct
+  Linear System Direct Method = "UMFPACK"     
+  ! alternative to above - Krylov subspace iterative solution
+!  Linear System Solver = "Iterative"
+!  Linear System Iterative Method =  "GCR"     !or "BICGStab"
+  Linear System Max Iterations = 5000
+  Linear System Convergence Tolerance = 1.0E-06
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU1"
+  Linear System Residual Output = 1
+
+
+  Steady State Convergence Tolerance = 1.0E-05
+!  Stabilization Method can be [Stabilized,P2/P1,Bubbles] 
+  Stabilization Method = Stabilized
+
+  Nonlinear System Convergence Tolerance = 1.0E-04
+  Nonlinear System Convergence Measure = Solution
+  Nonlinear System Max Iterations = 50
+  Nonlinear System Newton After Iterations = 3
+  Nonlinear System Newton After Tolerance =  1.0E-01
+!  Nonlinear System Relaxation Factor = 0.75
+End
+
+!-----------------------------------------------------
+! heat transfer limited by the pressure melting point
+! as upper limit
+!-----------------------------------------------------
+Solver 4
+!  Exec Solver = "Never"
+  Equation = String "Homologous Temperature Equation"
+  Procedure =  File "ElmerIceSolvers" "TemperateIceSolver"
+  ! Comment next line in parallel, as EliminateDirichlet does
+  ! not work in parallel
+  !------------------------------------------------------------
+!  Before Linsolve = "EliminateDirichlet" "EliminateDirichlet"
+  Variable = String "Temp"
+  Variable DOFs = 1
+  Stabilize = True
+  Optimize Bandwidth = Logical True
+  Linear System Solver = "Direct"
+  Linear System Direct Method = UMFPACK
+!  Linear System Iterative Method = "GCR"
+!  Linear System Max Iterations = 500
+  Linear System Convergence Tolerance = 1.0E-07
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU1"
+  Linear System Residual Output = 0
+  Nonlinear System Convergence Tolerance = 1.0E-06
+  Nonlinear System Max Iterations = 100
+  !Nonlinear System Relaxation Factor = Real 9.999E-01
+  Steady State Convergence Tolerance = 1.0E-04
+  ! the contact algorithm (aka Dirichlet algorithm)
+  !-----------------------------------------------------
+   Apply Dirichlet = Logical True
+  ! those two variables are needed in order to store
+  ! the relative or homologous temperature as well
+  ! as the residual
+  !-------------------------------------------------
+  Exported Variable 1 = String "Temp Homologous"
+  Exported Variable 1 DOFs = 1
+  Exported Variable 2 = String "Temp Residual"
+  Exported Variable 2 DOFs = 1
+End
+
+! we use m-yr-MPa system 1 yr = 31556926.0 sec
+Material 1
+  Name = "ice"
+  Density = Real $910.0*1.0E-06*(31556926.0)^(-2.0)
+  !----------------
+  ! vicosity stuff
+  !----------------
+  Viscosity Model = String "Glen"
+  ! Viscosity has to be set to a dummy value
+  ! to avoid warning output from Elmer
+  Viscosity = Real 1.0 
+  Glen Exponent = Real 3.0
+  Critical Shear Rate = Real 1.0e-10
+  ! Rate factors (Paterson value in MPa^-3a^-1)
+  Rate Factor 1 = Real 1.258e13  
+  Rate Factor 2 = Real 6.046e28
+  ! these are in SI units - no problem, as long as
+  ! the gas constant also is 
+  Activation Energy 1 = Real 60e3
+  Activation Energy 2 = Real 139e3  
+  Glen Enhancement Factor = Real 1.0
+  ! the variable taken to evaluate the Arrhenius law
+  ! in general this should be the temperature relative
+  ! to pressure melting point. The suggestion below plugs
+  ! in the correct value obtained with TemperateIceSolver
+   Temperature Field Variable = String "Temp Homologous"
+  ! the temperature to switch between the 
+  ! two regimes in the flow law
+  Limit Temperature = Real -10.0
+  ! In case there is no temperature variable (which here is the case)
+  ! Constant Temperature = Real -3.0
+
+  ! Heat transfer stuff (will come later)
+  Temp Heat Capacity = Variable Temp
+    Real MATC "capacity(tx)*(31556926.0)^(2.0)"
+
+  Temp Heat Conductivity = Variable Temp
+    Real MATC "conductivity(tx)*31556926.0*1.0E-06"
+
+  Temp Upper Limit = Variable Depth
+       Real MATC "273.15 - clausclap* tx * 910.0 * 9.81" !-> this is the correction of the presure melting point with respect to the hydrostatic overburden at the point
+End
+
+Body Force 1
+  Name = "BodyForce1"
+  Heat Source = 1
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real $-9.81 * (31556926.0)^(2.0)  !MPa - a - m
+End
+
+Boundary Condition 1
+  Name = "bedrock"
+  Target Boundaries = 1
+! include the bedrock DEM, which has two colums
+  Bottom Surface = Variable Coordinate 1
+  Real cubic
+     include  "steady_ELA400_bedrock.dat" 
+  End
+  Normal-Tangential Velocity = True
+  Velocity 1 = Real 0.0e0
+  Slip Coefficient 2 = Variable Coordinate 2
+     Real MATC "(1.0 - (tx > 300.0)*(tx < 400.0))*1000.0 + 1.0/100.0"
+  Temp Flux BC = Logical True
+  Temp Heat Flux = Real $ 0.200 * (31556926.0)*1.0E-06 ! 200 mW m^-2
+End
+
+Boundary Condition 2
+  Name = "sides"
+  Target Boundaries(2) = 3 4 ! combine left and right boundary
+  Velocity 1 = Real 0.0e0
+End
+
+Boundary Condition 3
+  Name = "surface"
+  Target Boundaries = 2
+! include the surface DEM, which has two colums
+  Top Surface = Variable Coordinate 1  
+  Real cubic
+     include  "steady_ELA400_surface.dat" 
+  End
+  Temp = Variable Coordinate 2 ! lapserate of -10/1000 C/m
+      Real
+            0.0   273.15 
+         1000.0   263.15
+      End 
+End
+
+
