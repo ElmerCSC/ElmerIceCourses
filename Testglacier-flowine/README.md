@@ -26,7 +26,7 @@ This folder contains the following sub-folders:
 * **testglacier**: contains the mesh, should - for what reason ever - the meshing process from the Gmsh input mesh not work out
 
 ## Getting started
-The first prognostic run is launched by
+The first diagnostic run is launched by
 ```bash
 $ ElmerSolver Stokes_prognostic.sif
 ```
