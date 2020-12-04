@@ -18,5 +18,14 @@ At the end of the *prognostic* part, the reader should be able to:
 * use **LUA** for variable dependent properties in the SIF
 * use **User Defined Functions** (UDF) for variable dependent properties in the SIF
 
+## Contents
+This folder contains the following sub-folders:
+* **Slides**: contains the instruction slides (currently only PDF)
+* **SolutionFiles**: contains the SIF's for the solution of the tasks given in the slides
+* **testglacier**: contains the mesh, should - for what reason ever - the meshing process from the Gmsh input mesh not work out
 
-
+## Getting started
+The first prognostic run is launched by
+```bash
+$ ElmerSolver Stokes_prognostic.sif
+```
