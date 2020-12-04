@@ -28,5 +28,5 @@ This folder contains the following sub-folders:
 ## Getting started
 The first diagnostic run is launched by
 ```bash
-$ ElmerSolver Stokes_prognostic.sif
+$ ElmerSolver Stokes_diagnostic.sif
 ```
