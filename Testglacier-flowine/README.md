@@ -12,6 +12,7 @@ These examples are a good entry point for starting Elmer/Ice simulations, as the
 * **constraining** for the upper limit of temperature given by the **pressure-melting point**
 * understand the principle of the *Solver Input File* (SIF)
 * using **MATC** to introduce variable dependent properties in the SIF
+
 At the end of the *prognostic* part, the reader should be able to:
 * run a transient flow-line model including the deformation and **evolution of the free surface**
 * couple the glacier to a given** surface mass balance**
