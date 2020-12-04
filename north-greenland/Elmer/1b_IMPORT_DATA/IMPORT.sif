@@ -1,0 +1,96 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! .sif file the 2020 Elmer/Ice beginner course
+! Author: F. Gillet-Chaulet (IGE-Grenoble-FR)
+!  
+!  purpose: 
+!   illustrate the use of GridDataReader and Scattered2DDataReader 
+!   to read 2D netcdf files
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!## PARAMETERS (MATC)
+! name of the mesh dir
+$MESH_NAME="mesh" 
+! minimal thickness
+$HMin=0.9
+! input data files
+$TOPOGRAPHY_DATA="../../Data/Topography/Topography.nc"
+$VELOCITY_DATA="../../Data/Velocity/velocity.nc"
+!## 
+!#######################################################
+Header
+  Mesh DB "." "$MESH_NAME$"
+End
+!#######################################################
+!#######################################################
+Simulation
+  Coordinate System  = Cartesian 
+  Simulation Type = Steady State
+
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = 1
+
+  Output File = "RUN0_.result"
+  Post File = "RUN0_.vtu"
+  max output level = 5
+End
+!#######################################################
+!#######################################################
+Body 1
+  Equation = 1
+End
+!#######################################################
+!#######################################################
+! Use GridDataReader
+!#######################################################
+Solver 1
+  Equation = Reader
+    Procedure = "GridDataReader" "GridDataReader"
+    Variable = -nooutput dumy
+ 
+   Read full array = logical True
+!---- NOTE: File is case sensitive, String is not!
+   Filename = File "$TOPOGRAPHY_DATA$"
+
+   X Dim Name = File "x"
+   Y Dim Name = File "y"
+!--- 
+  Variable 1 = File "thickness"
+  Target Variable 1 = String "HGrid"
+  Valid Min Value 1 = Real $HMin
+
+  Variable 2 = File "bed"
+  Target Variable 2 = String "bedrock"
+
+! exported variables  
+  Exported Variable 1 = HGrid
+  Exported Variable 2 = bedrock
+End
+
+Solver 2
+  Equation = Reader2
+    Procedure = "Scattered2DDataInterpolator" "Scattered2DDataInterpolator"
+    Variable = -nooutput dumy2
+
+  Variable 1 = File "thickness"
+  Variable 1 data file = File "$TOPOGRAPHY_DATA$"
+  Variable 1 Valid Min Value  = Real $HMin
+  Target Variable 1  = String "H"
+
+  Variable 2 = File "vx"
+  Variable 2 data file = File "$VELOCITY_DATA$"
+  Target Variable 2 = String "Vobs 1"
+
+  Variable 3 = File "vy"
+  Variable 3 data file = File "$VELOCITY_DATA$"
+  Target Variable 3 = String "Vobs 2"
+
+! exported variables
+  Exported Variable 1 = H
+  Exported Variable 2 = -dofs 2 "Vobs"
+End
+
+!#######################################################
+!#######################################################
+Equation 1
+  Active Solvers(2) = 1 2
+End
+

@@ -1,0 +1,254 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! .sif file for the inverse method
+!   Optimize the friction coefficient to reduce mismatch with obs. surface velocities
+!  
+! Author: F. Gillet-Chaulet (IGE-Grenoble-FR)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!#######################################################
+!# Parameters
+$name="<ID>_"
+! reguklarisation parameter
+$LambdaReg=<LAMBDA>
+
+! mesh directory
+$MESH="MESH_1"
+$HMin=0.9
+
+! number of iteration and output intervals
+$niter=250
+$OutPutIntervals=50
+
+! velocity data
+$OBSERVATION_FILE="../../Data/Velocity/velocity.nc"
+!#######################################################
+include ../Parameters/Physical_Params.IN
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!#######################################################
+Header
+  Mesh DB "." "$MESH$"
+End
+!#######################################################
+!#######################################################
+Constants
+  sea level = Real $zsl
+  water density = Real $rhow
+End
+!#######################################################
+!#######################################################
+Simulation
+  Coordinate System  = Cartesian 2D
+  Simulation Type = Steady State
+
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = $niter
+
+  Post File = "RUN_$name$_.vtu"
+!  OutPut File = "RUN_$name$_.result"
+  Output Intervals = $OutPutIntervals
+
+  Restart File = "RUN0_.result"
+  Restart Position = 0
+  Restart Time = 0.0
+  Restart Before Initial Conditions = Logical true
+
+  max output level = 3
+End
+!#######################################################
+!#######################################################
+Body 1
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+!#######################################################
+!#######################################################
+Initial Condition  1
+ ! Initial guess of log10(slip coef.)
+  alpha = Real -3.5
+End
+!#######################################################
+!#######################################################
+Body Force 1
+  Flow BodyForce 1 = Real 0.0            
+  Flow BodyForce 2 = Real 0.0              
+  Flow BodyForce 3 = Real $gravity
+
+!# Cost not computed if H<=Hmin
+  Cost_var Passive = Variable H
+         Real procedure "USFs" "PassiveCond_H"
+  Passive Element Min Nodes = Integer 3
+
+!# at the end take slip coef.=10^alpha (for post-processing or restart)
+  slc = Variable alpha
+      REAL procedure "ElmerIceUSF" "TenPowerA"
+End
+!#######################################################
+!#######################################################
+Material 1
+! Material properties
+  Viscosity Exponent = Real $1/n
+  Critical Shear Rate = Real 1.0e-16
+
+  SSA Mean Viscosity = Equals Mu
+  SSA Mean Density = Real $rhoi
+  SSA Critical Thickness = Real $HMin
+
+  SSA Friction Law = String "linear"
+  ! The friction parameter is 10^the optimised variable to insure > 0
+  SSA Friction Parameter = Variable alpha
+      REAL procedure "ElmerIceUSF" "TenPowerA"
+  SSA Friction Parameter Derivative = Variable alpha
+     REAL procedure "ElmerIceUSF" "TenPowerA_d"
+End
+!#######################################################
+!#######################################################
+Solver 1
+  Equation = "SSA"
+  Variable = -dofs 2 "SSAVelocity"
+
+  Procedure = "ElmerIceSolvers" "AdjointSSA_SSASolver"
+
+!! NUMERICAL INFORMATION
+  Linear System Solver = Direct
+  Linear System Direct Method = umfpack
+
+   Nonlinear System Max Iterations = 30
+   Nonlinear System Convergence Tolerance  = 1.0e-10
+   Nonlinear System Newton After Iterations = 10
+   Nonlinear System Newton After Tolerance = 1.0e-04
+   Nonlinear System Relaxation Factor = 1.00
+
+  Steady State Convergence Tolerance = Real 1.0e-12
+
+!!!!!
+  Sub-Element GL parameterization = logical True
+  GL integration points number = Integer 20
+!!!!!
+!! Variables required for the inverse method
+  Exported Variable 1 = -global CostValue
+  Exported Variable 2 = alpha
+  Exported Variable 3 = -nooutput DJDalpha
+  Exported Variable 4 = -nooutput "Velocityb"
+  Exported Variable 4 DOFs = 2
+End
+!#######################################################
+!!! Compute Cost function
+!! Here the cost is the discrete sum_1^Ndata 1/2 ||u-u^obs|| evaluated at the data location (which may not correspond to mesh nodes)
+Solver 2
+  Equation = "Cost"
+  procedure = "ElmerIceSolvers" "Adjoint_CostDiscSolver"
+
+   Cost Variable Name = String "CostValue"  ! Name of Cost Variable
+   Lambda = Real 1.0
+ ! save the cost as a function of iterations (iterations,Cost,rms=sqrt(2*Cost/Ndata)
+   Cost Filename = File "Cost_$name$.dat"
+
+   Observed Variable Name = String "SSAVelocity"
+   Observed Variable dimension = Integer 2
+
+ ! ASCII File with data: x,y,u,v
+   Observation File Name = File "$OBSERVATION_FILE$"
+end
+!#######################################################
+!!!!  Adjoint Solution
+Solver 3
+  Equation = "Adjoint"
+  Variable = -nooutput Adjoint
+  Variable Dofs = 2
+
+  procedure = "ElmerIceSolvers" "Adjoint_LinearSolver"
+
+!Name of the flow solution solver
+   Direct Solver Equation Name = string "SSA"
+
+  Linear System Solver = Direct
+  Linear System Direct Method = umfpack
+
+End
+!#######################################################
+!!!!!  Compute Derivative of Cost function / Beta
+Solver 4
+  Equation = "DJDBeta"
+   procedure = "ElmerIceSolvers" "AdjointSSA_GradientSolver"
+
+    Flow Solution Name = String "SSAVelocity"
+    Adjoint Solution Name = String "Adjoint"
+    ! Derivative with respect to the Friction parameter
+    ! here will be with respect to alpha (see Material)
+    Compute DJDBeta = Logical True
+    DJDBeta Name = String "DJDalpha"
+    Reset DJDBeta = Logical True
+end
+!#######################################################
+!!!!!  Compute Regularisation term
+!   Regularisation by default is: Lambda * int_{Pb dimension} 0.5 * (d(var)/dx)**2 
+!     OUTPUT are : J and DJDvar
+Solver 5
+  Equation = "CostReg"
+   procedure = "ElmerIceSolvers" "Adjoint_CostRegSolver"
+
+    Cost Filename=File "CostReg_$name$.dat"
+    Optimized Variable Name= String "alpha"
+    Gradient Variable Name= String "DJDalpha"
+    Cost Variable Name= String "CostValue"
+    Lambda= Real $LambdaReg
+    Reset Cost Value= Logical False  !=> DJDapha already initialized in solver DJDBeta; switch off initialisation to 0 at the beginning of this solver
+    A priori Regularisation= Logical False
+
+end
+!#######################################################
+!!!!! Optimization procedure :
+Solver 6
+  Equation = "Optimize_m1qn3"
+  procedure = "ElmerIceSolvers" "Optimize_m1qn3Parallel"
+
+  Cost Variable Name = String "CostValue"
+  Optimized Variable Name = String "alpha"
+  Gradient Variable Name = String "DJDalpha"
+  gradient Norm File = File "GradientNormAdjoint_$name$.dat"
+
+  !!
+  Mesh Independent = Logical FALSE
+
+ ! M1QN3 Parameters
+  M1QN3 dxmin = Real 1.0e-10
+  M1QN3 epsg = Real  1.e-6
+  M1QN3 niter = Integer $niter
+  M1QN3 nsim = Integer $niter
+  M1QN3 impres = Integer 5
+  M1QN3 DIS Mode = Logical true
+  M1QN3 df1 = Real 0.5
+  M1QN3 normtype = String "dfn"
+  M1QN3 OutputFile = File  "M1QN3_$name$.out"
+  M1QN3 ndz = Integer 20
+
+end
+!#######################################################
+Solver 7
+  Equation = "UpdateExport2"
+   Variable = -nooutput "dumy2"
+    Procedure = File "ElmerIceSolvers" "UpdateExport"
+    Optimize Bandwidth = logical false
+! recompute the slip coef. = 10^alpha (for post-processing or restart)
+  Exported Variable 1 =  slc
+End
+!#######################################################
+!#######################################################
+Equation 1
+  Active Solvers(7) = 1 2 3 4 5 6 7
+End
+!#######################################################
+!#######################################################
+Boundary Condition 1
+  Target Boundaries = 1
+
+  Normal-Tangential SSAVelocity = Logical True
+  SSAVelocity 1 = Real 0.0
+
+End
+Boundary Condition 2
+  Target Boundaries = 2
+  calving front = logical TRUE
+End

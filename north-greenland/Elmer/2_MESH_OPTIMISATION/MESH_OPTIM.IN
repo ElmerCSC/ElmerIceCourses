@@ -1,0 +1,44 @@
+!##################################
+! INCLUDE file for MESH_OPTIM.sif
+!###################################
+!name of the RUN : optimised mesh will be saved in MESH_$RUN
+$RUN="1"
+! the name of the mesh to optimize
+$MESH_IN="mesh"
+
+!##########################################################
+!##########################################################
+!## Mesh criteria
+!##########################################################
+!##########################################################
+$IMIN=3
+$IMAX=10
+$Tol=0.001
+
+!##########################################################
+!##########################################################
+!## Mesh criteria
+!##########################################################
+!##########################################################
+! Tolerated errors on U and H
+$U_err=15.0
+$H_err=30.0
+
+! Minimal and maximal mesh size
+$MinSize=500.0
+
+!Maximal mesh size is function to the disance to the margin
+$MarginExtent=40.0e3
+! Maximal mesh size outside the margin
+$HMaxOUT=15.0e3
+! Maximal mesh size within the margin
+$HMaxIN=5.0e3
+
+!##########################################################
+!##########################################################
+!###### DATA FILES
+!##########################################################
+!##########################################################
+$HMin=0.9
+$TOPOGRAPHY_DATA="../../Data/Topography/Topography.nc"
+$VELOCITY_DATA="../../Data/Velocity/velocity.nc"

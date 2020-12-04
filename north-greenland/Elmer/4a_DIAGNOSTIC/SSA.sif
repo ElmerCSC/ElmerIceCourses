@@ -1,0 +1,109 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Compute the 2D horizonatl velocity field 
+! using the Shallow Shelf approximation
+!
+! Author: F. Gillet-Chaulet (IGE-Grenoble-FR)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!# Parameters
+! name of the simulation
+$name="RUN1_"
+! mesh directory name
+$MESH="MESH_1"
+! minimal ice thickness
+$HMin=0.9
+!#######################################################
+include ../Parameters/Physical_Params.IN
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Header
+  Mesh DB "." "$MESH$"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Constants
+  sea level = Real $zsl
+  water density = Real $rhow
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = Cartesian 2D 
+
+  Simulation Type = Steady State
+
+  Steady State Max Iterations = 1
+  Steady State Min Iterations = 1
+
+  OutPut File = "$name$.result"
+  Post File = "$name$.vtu"
+
+  Restart File = "RUN0_.result"
+  Restart Position = 0
+  Restart Time = Real 0.0
+
+  max output level = 3
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body 1
+  Equation = 1
+  Material = 1
+  Body Force = 1
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0
+  Flow BodyForce 2 = Real 0.0
+  Flow BodyForce 3 = Real $gravity
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+! Material properties
+  Viscosity Exponent = Real $1/n
+  Critical Shear Rate = Real 1.0e-16
+
+  SSA Mean Viscosity = Equals Mu
+  SSA Mean Density = Real $rhoi
+
+  SSA Critical Thickness = Real $HMin
+
+! slip coeff for the SSA
+   SSA Friction Law = String "linear"
+   SSA Friction Parameter = Equals slc0
+End
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Solver 1
+  Equation = "SSA"
+  Variable = -dofs 2 "SSAVelocity"
+
+   Procedure = "ElmerIceSolvers" "SSABasalSolver"
+
+ ! Numerical settings;
+  Linear System Solver = Direct
+  Linear System Direct Method = umfpack
+
+  Nonlinear System Max Iterations = 20
+  Nonlinear System Convergence Tolerance  = 1.0e-05
+  Nonlinear System Newton After Iterations = 6
+  Nonlinear System Newton After Tolerance = 1.0e-03
+  Nonlinear System Relaxation Factor = 1.00
+
+ ! GL subgrid scheme
+  Sub-Element GL parameterization = logical True
+  GL integration points number = Integer 20
+End
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Equation 1
+  Active Solvers (1)= 1
+End
+!#####
+Boundary Condition 1
+  Target Boundaries = 1
+
+  Normal-Tangential SSAVelocity = Logical True
+  SSAVelocity 1 = Real 0.0
+
+End
+Boundary Condition 2
+  Target Boundaries = 2
+  Calving Front = Logical True
+End

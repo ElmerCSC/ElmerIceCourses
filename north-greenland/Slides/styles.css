@@ -1,0 +1,33 @@
+slides > slide:not(.nobackground):before {
+      font-size: 12pt;
+      content: "Elmer/Ice beginner course - Nov. 2020 - F. Gillet-Chaulet (IGE - Grenoble)";
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background-image:  url('./logos/logo_elmerICE.png') , url('./logos/logo_protect.png'), url('./logos/logo_tipaccs.png');
+      background-position: 0px 0px , 70px 0px , 190px 0px ; 
+      -webkit-background-size:  60px 36px, 108px 36px, 108px 36px;
+      -moz-background-size: 60px 36px, 108px 36px, 108px 36px;
+      -o-background-size:  60px 36px, 108px 36px, 108px 36px;
+      background-size:  60px 36px, 108px 36px, 108px 36px;
+      padding-left: 360px;
+      height: 36px;
+      line-height: 3.0;
+}
+
+.gdbar img {
+  width: 300px !important;
+  height: 150px !important;
+  margin: 8px 8px;
+}
+
+.gdbar {
+  width: 400px !important;
+  height: 170px !important;
+}
+
+
+.table{
+  width: auto;
+  font-size: 2px;
+}

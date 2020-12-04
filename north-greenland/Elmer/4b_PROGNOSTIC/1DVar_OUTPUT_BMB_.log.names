@@ -1,0 +1,19 @@
+File started at: 2020/11/20 12:06:45
+ 
+Elmer version: 8.4
+Elmer revision: 8860d158
+Elmer Compilation Date: 2020-11-10
+ 
+Variables in columns of matrix:1DVar_OUTPUT_BMB_.dat
+   1: Time
+   2: Volume
+   3: Volume Above Floatation
+   4: Volume rate of change
+   5: SMB Flux
+   6: BMB Flux
+   7: Residual Flux
+   8: Ice Discharge
+   9: Ice flux at Grounding Line
+  10: Grounded ice area
+  11: Floating ice area
+  12: Ice Free area
