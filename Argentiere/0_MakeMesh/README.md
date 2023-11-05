@@ -1,0 +1,23 @@
+`Makegeo.py`<br>
+Read a contour of the area around the Argentiere glacier and build the `geo`input file that will be used to make the mesh
+
+You can change the resolution of the mesh directly by modifying the **lc** variable in ARG_mesh.geo
+
+Then make the Elmer mesh:<br>
+`gmsh -1 -2 ARG_mesh.geo -o ARG_mesh.msh`<br>
+`ElmerGrid 14 2 ARG_mesh.msh -autoclean`<br> 
+
+If going parallel:<br>
+`ElmerGrid 14 2 ARG_mesh.msh -autoclean -metis 4 0`<br> 
+
+Create a vtu file to visualise the mesh:<br>
+`ElmerGrid 14 5 ARG_mesh.msh -autoclean -metis 4 0`<br>
+`ElmerGrid 14 5 ARG_mesh.msh -autoclean`<br>
+
+At the end, the directory ARG_mesh should be copied in all the directories:<br>
+'cp -r ARG_mesh ../1_IMPORT_DEM/'<br>
+'cp -r ARG_mesh ../2_ICE_AGE/'<br>
+'cp -r ARG_mesg ../3_TRANSIENT/'<br>
+
+
+

@@ -1,0 +1,293 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!                                                  !!
+!! Elmer/Ice Beginner course 2023                   !!
+!!                                                  !!
+!! Compute the age of the ice                       !!
+!!                                                  !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+check keywords warn
+echo on
+
+Header
+  Mesh DB "." "ARG_mesh"
+End
+
+include "../Parameters/Physical_Parameters.IN"
+
+Constants
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  =  Cartesian 3D 
+  Simulation Type = Steady        
+
+  Extruded Mesh Levels = Integer #Nz
+
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = 1
+
+  Output File = "ARG_AGE.result"
+  Post File = "ARG_AGE.vtu"
+  ! vtu: Save Bulk Only = Logical True
+
+  Restart File = "../../1_IMPORT_DEM/ARG_mesh/ARG_DEM.result"
+  Restart Position = 0
+  Restart Before Initial Conditions = Logical False
+
+  max output level = 3
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! The ice 
+Body 1
+  Name = "glacier"
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  Pressure = Real 0.0 
+  Velocity 1 = Real 0.0 
+  Velocity 2 = Real 0.0 
+  Velocity 3 = Real 0.0 
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0                          
+  Flow BodyForce 2 = Real 0.0
+  Flow BodyForce 3 = Real #gravity 
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+! For the ice flow  
+  Density = Real #rhoi
+  Viscosity Model = String "Glen"
+  Viscosity = Real 1.0 ! Dummy but avoid warning output
+  Glen Exponent = Real 3.0
+  Critical Shear Rate = Real 1.0e-10
+
+! properties with T
+  Rate Factor 1 = Real #A1
+  Rate Factor 2 = Real #A2
+  Activation Energy 1 = Real #Q1
+  Activation Energy 2 = Real #Q2
+  Glen Enhancement Factor = Real 1.0
+  Limit Temperature = Real -10.0
+  Relative Temperature = Real 0.0
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 1
+  Exec Solver = Never
+  Exec Solver = "Before Simulation"
+  Equation = "Read DEMs"
+
+  Procedure = "ElmerIceSolvers" "Grid2DInterpolator"
+
+  ! Bedrock DEM
+  Variable 1 = String "bedDEM"
+  Variable 1 data file = File "../Data/DEM_bedrock_ArgentiereLarge.dat"
+  Variable 1 x0 = Real 949567.79d0
+  Variable 1 y0 = Real 106682.32d0
+  Variable 1 lx = Real 17900.0
+  Variable 1 ly = Real 21640.0
+  Variable 1 Nx = Integer 896
+  Variable 1 Ny = Integer 1083
+  Variable 1 Invert = Logical False 
+  Variable 1 Fill = Logical True  
+  Variable 1 Position Tol = Real 1.0
+  Variable 1 No Data = Real -9999.0
+  Variable 1 No Data Tol = Real 1.0 
+
+  ! Surface DEM
+  Variable 2 = String "SurfDEM"
+  Variable 2 data file = File "../Data/DEM_surface_Argentiere1998.dat"
+  Variable 2 x0 = Real 949567.79d0
+  Variable 2 y0 = Real 106682.32d0
+  Variable 2 lx = Real 17900.0
+  Variable 2 ly = Real 21640.0
+  Variable 2 Nx = Integer 896
+  Variable 2 Ny = Integer 1083
+  Variable 2 Invert = Logical False 
+  Variable 2 Fill = Logical True  
+  Variable 2 Position Tol = Real 1.0
+  Variable 2 No Data = Real -9999.0
+  Variable 2 No Data Tol = Real 1.0 
+End 
+
+
+Solver 2  
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+  Mesh Velocity Variable = String "dSdt"
+  Mesh Update Variable = String "dS"
+  Mesh Velocity First Zero = Logical True
+
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real #MinH
+End
+
+Solver 3
+  Equation = "NormalVector" 
+  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
+  Variable = String "Normal Vector" 
+  Variable DOFs = 3
+  Optimize Bandwidth = Logical False 
+  ComputeAll = Logical true
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Stokes
+Solver 4
+  Exec Solver = Never
+  Equation = "Stokes-Vec"
+  Procedure = "IncompressibleNSVec" "IncompressibleNSSolver"
+  Div-Curl Discretization = Logical False
+  
+  Exported Variable 1 = -dofs 1 "dSdt"
+  Exported Variable 2 = -dofs 1 "dS"
+  Exported Variable 3 = -dofs 1 "BedDEM"
+  Exported Variable 4 = -dofs 1 "SurfDEM"
+
+  Optimize Bandwidth = Logical True
+  Flow Model = Stokes
+  Stabilization Method = String Stabilized
+
+  Linear System Abort Not Converged = Logical False
+  ! Iterative approach:
+  !---------------------
+  Linear System Solver = Iterative
+  Linear System Iterative Method = "GCR"
+  Linear System Convergence Tolerance = 1.0E-08
+! Solving for residual allows us to use sloppier tolerances
+! This seems to faster strategy.
+!  Linear System Residual Mode = True
+!  Linear System Convergence Tolerance = 1.0E-04
+  Linear System Max Iterations = 500
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU1"
+  Linear System Residual Output = 10
+
+  !-------------------------------------------
+  !Linear System Solver = Direct
+  !Linear System Direct Method = $directmethod ! Parallel: MUMPS, Serial: UMFPACK
+
+  !Non-linear iteration settings:
+  !------------------------------
+  Nonlinear System Max Iterations = 50
+  Nonlinear System Convergence Tolerance  = 1.0e-5
+  Nonlinear System Newton After Iterations = 50
+  Nonlinear System Newton After Tolerance = 1.0e-5
+  !Nonlinear System Consistent Norm = True
+  ! Nonlinear System Relaxation Factor = 1.00
+  ! Nonlinear System Reset Newton = Logical True
+
+  ! Convergence on timelevel (not required here)
+  !---------------------------------------------
+  Steady State Convergence Tolerance = Real 1.0e-3
+
+  !Relative Integration Order = -1
+  Number of Integration Points = Integer 44 ! 21, 28, 44, 64, ...
+
+  ! 1st iteration viscosity is constant
+  Constant-Viscosity Start = Logical False
+
+! Some timing info
+  Boundary Assembly Timing = Logical True
+  Bulk Assembly Timing = Logical True
+  Solver Timing = Logical True
+  Linear System Timing = Logical True
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Semilagrangian solver for advection dominated flow
+Solver 5
+  Equation = ParticleAdvector
+  Procedure = "ParticleAdvector" "ParticleAdvector"
+
+! Initialize particles at center of elements (as opposed to nodes)
+  Advect Elemental = Logical True
+
+!  Reinitialize Particles = Logical True
+!  Particle Accurate At Face = Logical False
+
+! Timestepping strategy
+  Simulation Timestep Sizes = Logical False
+  Particle Dt Constant = Logical False
+  Max Timestep Intervals = Integer 1000
+
+! Time in average 4 steps in each element 
+  Timestep Unisotropic Courant Number = Real 0.25
+  Max Timestep Size = Real 1.0e3   ! 1.0e3
+
+! Give up integration if particles are tool old
+  Max Integration Time = Real 1.0e4  !1.0e4
+
+! Integration forward in time
+  Runge Kutta = Logical False
+  Velocity Gradient Correction = Logical True
+  Velocity Variable Name = String "Flow Solution"
+
+! Show some info in the end
+  Particle Info = Logical True
+  Particle Time = Logical True
+
+! The internal variables for this solver
+  Variable 1 = String "Particle Distance"
+  Variable 2 = String "Particle Time"
+  Operator 2 = String "Cumulative"
+
+! The field variables being advected
+  Variable 3 = String "Coordinate 1"
+  Result Variable 3 = String "Advected X"
+  Variable 4 = String "Coordinate 2"
+  Result Variable 4 = String "Advected Y"
+  Variable 5 = String "Coordinate 3"
+  Result Variable 5 = String "Advected Z"
+
+  Solver Timing = True
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(5) = 1 2 3 4 5
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! lateral side of the glacier 
+Boundary Condition 1
+  Target Boundaries = 1
+  Name = "side"
+  Mass Consistent Normals = Logical True
+  Normal-Tangential Velocity = Logical True
+  Velocity 1 = Real 0.0
+End
+
+! Bedrock 
+Boundary Condition 2
+  Name = "bed"
+  Bottom Surface = Equals BedDEM
+  Mass Consistent Normals = Logical True
+  Normal-Tangential Velocity = Logical True  
+  Velocity 1 = Real 0.0  
+  Weertman Friction Coefficient = Real #Cw      
+  Weertman Exponent = Real #mw
+  Weertman Linear Velocity = Real 0.00001
+End
+
+! Upper Surface
+Boundary Condition 3
+  Name = "upper surface"
+  Top Surface = Equals SurfDEM
+End
