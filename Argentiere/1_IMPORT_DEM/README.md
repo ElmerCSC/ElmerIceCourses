@@ -2,6 +2,6 @@ In this first step, only read the different DEMs needed for the simulation and e
 
 Execute the simulation:<br>
 Serial: 'ElmerSolver initialise_DEM.sif'<br> 
-Parallel: `mpirun -np 4 ElmerSolver_mpi initialise_DEM.sif`  
+Parallel: `mpirun -np 4 ElmerSolver initialise_DEM.sif`  
 
 Take care that the number of nodes required (np) is compatible with the number of partitions of the mesh (4 here) 

@@ -2,7 +2,7 @@ In this third step, we move to a transient simulation assuming a given Surface M
 
 Execute the simulation:<br>
 Serial: 'ElmerSolver transient.sif'<br> 
-Parallel: `mpirun -np 4 ElmerSolver_mpi transient.sif`  
+Parallel: `mpirun -np 4 ElmerSolver transient.sif`  
 
 A directory GlacierOut has to be created to store the output .dat files
 
