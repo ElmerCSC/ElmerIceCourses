@@ -1,0 +1,369 @@
+!---LUA BEGIN 
+! function IfThenElse(condition,t,f) 
+!   if condition then return t else return f end 
+! end 
+!---LUA END 
+
+$namerun = "synt_steady_noslip_Stokes_"
+
+Header
+  Mesh DB "." "Mesh2d"
+End
+
+include "../Parameters/Physical_Parameters.IN"
+
+!
+#Startyear = 0.0
+
+!number of timesteps/year
+#nt=10
+!dt
+#dt = 1.0/nt
+!number of years
+#ny=10
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  =  Cartesian 3D 
+
+  Simulation Type = Transient
+  Timestepping Method = "bdf"
+  BDF Order = 2
+
+  Timestep Intervals(1) = #nt*ny
+  Output Intervals(1) = #10*nt
+  Timestep Sizes(1) = #dt
+
+  Steady State Min Iterations = 1
+  Steady State Max Iterations = 4
+
+  !! Internal Extrusion
+  include Extrusion.sif
+
+  !! Restart 
+  Restart File = "synt_DEM.result"
+  Restart Position = 0
+  Restart Time = Real #Startyear
+  Restart Before Initial Conditions = Logical True
+
+
+  !! Output
+  Output File = "$namerun$.result"
+  Post File = "$namerun$.vtu"
+  vtu:VTU Time Collection = Logical True
+
+  !! scalar outputs to get timing infos
+  Scalars File = "Scalars_$namerun$.dat"
+  scalars: Parallel Reduce = Logical True
+  scalars: Variable 1 = String "Time"
+  scalars: Operator 2 = String "partitions"
+  scalars: Variable 3 = String "Flow Solution"
+  scalars: Operator 3 = String "dofs"
+
+  Simulation Timing = Logical True
+
+
+
+  max output level = 3
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body 1
+  Equation = 1
+  Body Force = 1
+  Material = 1
+  Initial Condition = 1
+End
+Body 2
+  Name= "surface"
+  Equation = 2
+  Material = 1
+  Body Force = 2
+  Initial Condition = 2
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  
+End
+
+Initial Condition 2
+  Zs= Equals surfDEM
+  Ref Zs = Equals surfDEM       
+  
+  IcyMask = Real 1.0
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = Real 0.0    
+  Flow BodyForce 2 = Real 0.0            
+  Flow BodyForce 3 = Real #gravity 
+
+! This should be in Body Force 2 but not working 
+! for solver executed on a boundary
+  Zs = Variable bedDEM
+    Real LUA "tx[0]+ MinH"
+  ! should make it also dependent on SMB, i.e. allow zs to change if SMB>0
+  Zs Condition = Variable "IcyMask","Mass Balance"
+    Real LUA "IfThenElse((tx[0]< -0.5) and (tx[1] <= 0.0), 1.0, -1.0)"
+End
+
+Body Force 2
+  Zs Accumulation Flux 1 = real 0.0
+  Zs Accumulation Flux 2 = real 0.0
+  Zs Accumulation Flux 3 = Equals "Mass Balance"
+
+! surface slope norm
+  slope = Variable "dzs 1", "dzs 2"
+    REAL LUA "math.sqrt(tx[0]*tx[0]+tx[1]*tx[1])"
+
+! mask mass balance with surface slope
+  Mass Balance = Variable "Mass Balance Ini","slope"
+    Real LUA "IfThenElse(tx[0]>0,IfThenElse(tx[1]< 1.2, tx[0], 0.0),tx[0])"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+! For the ice flow  
+  Density = Real #rhoi   
+
+
+  Viscosity Model = String "Glen"
+  Viscosity = Real 1.0
+  Glen Exponent = Real 3.0
+  Critical Shear Rate = Real 1.0e-10
+
+ ! properties with T
+  Rate Factor 1 = Real #A1
+  Rate Factor 2 = Real #A2
+  Activation Energy 1 = Real #Q1
+  Activation Energy 2 = Real #Q2
+  Glen Enhancement Factor = Real 1.0
+  Limit Temperature = Real -10.0
+  Relative Temperature = Real 0.0
+
+ ! or provide A
+  !Set Arrhenius Factor = Logical True
+  !Arrhenius Factor = Real #A
+
+  Min Zs = Variable bedDEM
+    Real LUA "tx[0]+ MinH"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Map mesh to bottom and top surfaces
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 1
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+! Extrusion direction
+  Active Coordinate = Integer 3
+
+  Displacement Mode = Logical False
+
+! Check for critical thickness
+  Correct Surface = Logical True
+  Minimum Height = Real #MinH
+
+! Top and bottom surfaces defined from variables
+  Top Surface Variable Name = String "Zs"
+  Bottom Surface Variable Name = String "bedDEM"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Compute Thickness and Depth
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 2
+  Equation = "HeightDepth 1"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+
+  Active Coordinate = Integer 3
+
+  Project to everywhere = Logical True
+
+  Operator 1 = Thickness
+  Operator 2 = Depth
+  !Operator 3 = Height
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Icy Mask
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 3
+  ! to be executed on top surface (need Thickness)
+  Equation = "IcyMask"
+  Procedure = "ElmerIceSolvers" "IcyMaskSolver"
+  Variable = "IcyMask"
+  Variable DOFs = 1
+
+ ! no matrix resolution
+  Optimize Bandwidth = Logical False
+
+  Toler = Real 1.0e-1
+  Ice Free Thickness = Real 5.0
+  Remove Isolated Points = Logical True
+  Remove Isolated Edges = Logical True
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Stokes 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 4
+  Equation = "Stokes-Vec"
+  Procedure = "IncompressibleNSVec" "IncompressibleNSSolver"
+  Stokes Flow = logical true
+  !Exec Solver = "Never"
+
+  Div-Curl Discretization = Logical False
+  Stabilization Method = String Stabilized
+
+  !linear settings:
+  !------------------------------
+  include linsys/BiCGStab.sif
+
+  !Non-linear iteration settings:
+  !------------------------------ 
+  Nonlinear System Max Iterations = 20
+  Nonlinear System Convergence Tolerance  = 1.0e-5
+  Nonlinear System Newton After Iterations = 4
+  Nonlinear System Newton After Tolerance = 1.0e-4
+  Nonlinear System Reset Newton = Logical True
+  ! make it safe abort if non-linear diverge
+  Nonlinear System Abort Not Converged = Logical True
+
+  ! Convergence on timelevel (not required here)
+  !---------------------------------------------
+  Steady State Convergence Tolerance = Real 1.0e-3
+
+  Relative Integration Order = -1
+  !Number of Integration Points = Integer 44 ! 21, 28, 44, 64, ...
+
+  ! 1st iteration viscosity is constant
+  Constant-Viscosity Start = Logical False
+
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Surface slope
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 5
+  Equation = "Surface Slope"
+  Procedure = "../SRC/Compute2DNodalGradient" "Compute2DNodalGradient"
+  Variable = -nooutput "dzs"
+  Variable DOFs = 2
+
+  Variable Name = String "zs"
+
+  Update Exported Variables = Logical True
+  Exported Variable 1 = "slope"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Mass balance forcing
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 6
+  Equation = SMB
+  Procedure = "../SRC/SyntSMB" "SyntSMB"
+  Variable = "Mass Balance Ini"
+  Variable DOFs = 1
+
+ ! no matrix resolution
+  Optimize Bandwidth = Logical False
+
+  SMB Glacier Head = Real #GlacierHead
+  SMB Glacier Head Elevation = Real #GlacierHeadElevation
+  SMB Exponent = Real #SMBExponent
+  SMB ELA = Real #SMBELA
+
+ !! The variable "Mass Balance"  is updated in the body forces
+ !! so that it can be changed; e.g. masked by surface slope...
+  Update Exported Variables = Logical True
+  Exported Variable 1 = "Mass Balance"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  Free surface evolution
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Solver 7
+  Equation =  String "Free Surface Evolution"
+  Procedure = "FreeSurfaceSolver" "FreeSurfaceSolver"
+
+  Variable = "Zs"
+  Variable DOFs = 1
+
+ ! calculate dz/dt (better than from mesh velocity in case of steady-state iterations)
+  Calculate Velocity = Logical True
+
+ ! Apply internal limiters
+  Apply Dirichlet = Logical true
+
+ ! Steb method 
+  Stabilization Method = Stabilized
+
+ ! linear settings
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStab
+  Linear System Max Iterations  = 1000
+  Linear System Preconditioning = ILU0
+  Linear System Convergence Tolerance = 1.0e-10
+
+ ! non-linear settings
+  Nonlinear System Max Iterations = 20 ! variational inequality needs more than one round
+  Nonlinear System Min Iterations = 2
+  Nonlinear System Convergence Tolerance = 1.0e-8
+
+  Steady State Convergence Tolerance = 1.0e-6
+
+ ! loads also takes into account dirichlet conditions
+ ! to compute residual flux
+  calculate loads = Logical True
+
+  Exported Variable 1 = -nooutput "Zs Residual"
+  Exported Variable 2 =  "Ref Zs"
+End
+
+Solver 8
+  ! to be executed on top surface (need Thickness)
+  Exec Solver = After Timestep
+  Equation = "Save 1D Vars"
+  Procedure = "ElmerIceSolvers" "Scalar_OUTPUT"
+  Variable = -nooutput "savescal"
+
+  File Name = File "1DVar_OUTPUT_$namerun$.dat"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(3) = 1 2 4 
+End
+
+Equation 2
+  Active Solvers(5) = 3 5 6 7 8
+  Flow Solution Name = String "Flow Solution"
+  Convection = Computed
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Side
+Boundary Condition 1
+  Target Boundaries = 1
+  Name = "side"
+
+  Normal-Tangential Velocity = Logical True
+  Velocity 1 = Real 0.0e0
+
+End
+
+! Bedrock 
+Boundary Condition 2
+  Name = "bed"
+
+ include BCs/noslip.sif 
+
+End
+
+! Upper Surface
+Boundary Condition 3
+  Name = "upper surface"
+  Body Id = 2
+
+End
+
