@@ -1,0 +1,16 @@
+
+  Normal-Tangential Velocity = Logical True
+  Mass Consistent Normals = Logical True
+
+  Velocity 1 = Real 0.0e0
+  Slip Coefficient 2 =  Real #slc
+  Slip Coefficient 3 =  Real #slc
+
+
+ ! set no sliding if H< 2m
+  Velocity 2 = Real 0.0e0
+  Velocity 3 = Real 0.0e0
+  Velocity 2 Condition = Variable "thickness"
+    Real LUA "IfThenElse(tx[0]< 2.0, 1.0, -1.0)"
+  Velocity 3 Condition = Variable "thickness"
+    Real LUA "IfThenElse(tx[0]< 2.0, 1.0, -1.0)"

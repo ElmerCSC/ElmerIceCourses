@@ -1,0 +1,29 @@
+<VTKFile type="PUnstructuredGrid" version="0.1" byte_order="LittleEndian">
+  <PUnstructuredGrid>
+    <PPointData Scalars="icymask" Vectors="velocity">
+      <PDataArray type="Float64" Name="icymask" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="pressure" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="slope" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="mass balance ini" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="mass balance" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="zs" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="ref zs" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="zs loads" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="zs velocity" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="beddem" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="surfdem" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="thickness" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="depth" NumberOfComponents="1" format="appended"/>
+      <PDataArray type="Float64" Name="velocity" NumberOfComponents="3" format="appended"/>
+      <PDataArray type="Float64" Name="normal vector" NumberOfComponents="3" format="appended"/>
+    </PPointData>
+    <PCellData>
+      <PDataArray type="Int32" Name="GeometryIds" format="appended"/>
+    </PCellData>
+    <PPoints>
+      <DataArray type="Float64" NumberOfComponents="3" format="appended"/>
+    </PPoints>
+    <Piece Source="synt_steady_noslip_Stokes__2np1_t0031.vtu"/>
+    <Piece Source="synt_steady_noslip_Stokes__2np2_t0031.vtu"/>
+  </PUnstructuredGrid>
+</VTKFile>

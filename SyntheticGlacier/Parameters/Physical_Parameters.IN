@@ -1,0 +1,22 @@
+! Define the parameter in MPa - a - m
+#yearinsec = 365.25*24*60*60
+#rhoikg = 917.0
+#rhowkg = 1000.0
+#rhoi = rhoikg/(1.0e6*yearinsec^2)   
+#rhow = rhowkg/(1.0e6*yearinsec^2) 
+#gravity = -9.81*yearinsec^2
+
+! Prefactor from Cuffey and Paterson (2010) in MPa^{-3} a^{-1}
+#A1 = 2.89165e-13*yearinsec*1.0e18 
+#A2 = 2.42736e-02*yearinsec*1.0e18 
+#Q1 = 60.0e3
+#Q2 = 115.0e3
+
+#Nz = 5
+#MinH = 1.0
+
+! SMB Parameters
+#GlacierHead=2.0
+#GlacierHeadElevation=4400.0
+#SMBExponent=2.0
+#SMBELA=3700.0
