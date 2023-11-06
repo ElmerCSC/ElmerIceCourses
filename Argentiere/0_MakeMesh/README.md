@@ -1,5 +1,5 @@
-`Makegeo.py`<br>
 Read a contour of the area around the Argentiere glacier and build the `geo`input file that will be used to make the mesh
+`python Contour2geo.py -r 150.0 -i ../Data/contour_2014_ARG.dat -o ARG_mesh.geo`<br>
 
 You can change the resolution of the mesh directly by modifying the **lc** variable in ARG_mesh.geo
 

@@ -258,11 +258,11 @@ Solver 4
   !------------------------------
   Nonlinear System Max Iterations = 50
   Nonlinear System Convergence Tolerance  = 1.0e-5
-  Nonlinear System Newton After Iterations = 51
-  Nonlinear System Newton After Tolerance = 1.0e-6
+  Nonlinear System Newton After Iterations = 10
+  Nonlinear System Newton After Tolerance = 1.0e-2
+  Nonlinear System Reset Newton = Logical True
   !Nonlinear System Consistent Norm = True
   ! Nonlinear System Relaxation Factor = 1.00
-  ! Nonlinear System Reset Newton = Logical True
 
   ! Convergence on timelevel (not required here)
   !---------------------------------------------
