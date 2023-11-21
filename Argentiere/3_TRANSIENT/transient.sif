@@ -436,4 +436,6 @@ End
 Boundary Condition 3
   Name = "upper surface"
   Body Id = 2
+  FSSA Theta = Real 1.0
+  FSSA Flag = String "Full"
 End
