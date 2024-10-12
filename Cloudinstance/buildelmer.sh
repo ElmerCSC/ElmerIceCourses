@@ -54,6 +54,7 @@ if  ! cmake -S /home/ubuntu/elmerfem -DCMAKE_INSTALL_PREFIX="/usr/local"\
     exit -1
 fi
 echo "Starting compilation - this may take a while (depending on the speed of your computer's CPU"
-make -j 4 install
+make -j 4
+sudo make install
 echo "done with compilation"
 exit 0
