@@ -53,7 +53,7 @@ echo "#############################"
 mkdir build
 cd build
 cmake -D CMAKE_INSTALL_PREFIX="/usr/local" -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_SHARED_LIBS:BOOL=TRUE -D MMG_INSTALL_PRIVATE_HEADERS=ON -D CMAKE_C_FLAGS="-fPIC  -g" -D CMAKE_CXX_FLAGS="-fPIC -std=c++11 -g"  ..
-make -j $(nproc) install
+sudo make -j $(nproc) install
 #cd build/
 #cmake -S "/home/ubuntu/ElmerDependencies/mmg" -DBUILD_SHARED_LIBS:BOOL=TRUE -DLIBMMG3D_SHARED:BOOL=TRUE -DLIBMMG2D_SHARED:BOOL=TRUE -D CMAKE_C_FLAGS="-fPIC -O2" -D CMAKE_CXX_FLAGS="-fPIC -O2"
 make
@@ -79,7 +79,7 @@ echo "#############################"
 mkdir build
 cd build
 cmake -D CMAKE_INSTALL_PREFIX="/usr/local" -D CMAKE_BUILD_TYPE=RelWithDebInfo -D BUILD_SHARED_LIBS:BOOL=TRUE -D DOWNLOAD_MMG=OFF  -D MMG_DIR="/usr/local"  ..
-make -j $(nproc) install
+sudo make -j $(nproc) install
 # cleaning up
 cd /home/ubuntu/
 echo "if you want to clean up, then remove:"
