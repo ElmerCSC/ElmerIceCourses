@@ -1,7 +1,7 @@
 In this third step, we move to a transient simulation assuming a given Surface Mass Balance
 
 Execute the simulation:<br>
-Serial: 'ElmerSolver transient.sif'<br> 
+Serial: `ElmerSolver transient.sif`<br> 
 Parallel: `mpirun -np 4 ElmerSolver transient.sif`  
 
 A directory GlacierOut has to be created to store the output .dat files
