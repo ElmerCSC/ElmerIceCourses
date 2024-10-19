@@ -4,7 +4,7 @@ Execute the simulation:<br>
 Serial: 'ElmerSolver initialise_DEM.sif'<br> 
 Parallel: `mpirun -np 4 ElmerSolver initialise_DEM.sif`  
 
-The simulation can also be run using the Blatter-Pattyn solution instead of the Stokes using 'initialise_1stO_DEM.sif' 
+The simulation can also be run using the Blatter-Pattyn solution instead of the Stokes using 'initialise_1stO_DEM.sif<br>
 Serial: 'ElmerSolver initialise_1stO_DEM.sif'<br> 
 Parallel: `mpirun -np 4 ElmerSolver initialise_1stO_DEM.sif`  
 
