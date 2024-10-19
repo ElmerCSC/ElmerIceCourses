@@ -17,7 +17,7 @@ Create a vtu file to visualise the mesh:<br>
 At the end, the directory ARG_mesh should be copied in all the directories:<br>
 'cp -r ARG_mesh ../1_IMPORT_DEM/'<br>
 'cp -r ARG_mesh ../2_ICE_AGE/'<br>
-'cp -r ARG_mesg ../3_TRANSIENT/'<br>
+'cp -r ARG_mesh ../3_TRANSIENT/'<br>
 
 
 
