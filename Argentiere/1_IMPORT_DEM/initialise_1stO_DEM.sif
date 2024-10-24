@@ -115,7 +115,6 @@ Solver 1
   Variable 2 No Data Tol = Real 1.0 
 End 
 
-
 Solver 2  
   Equation = "MapCoordinate"
   Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
@@ -129,6 +128,7 @@ Solver 2
   Correct Surface = Logical True
   Minimum Height = Real #MinH
 End
+
 Solver 3 
   Exec Solver = "before simulation" 
   Equation = "HeightDepth"
@@ -137,18 +137,10 @@ Solver 3
   Operator 1 = depth
   Operator 2 = height
 End 
-Solver 4
-  Equation = "NormalVector" 
-  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
-  Variable = String "Normal Vector" 
-  Variable DOFs = 3
-  Optimize Bandwidth = Logical False 
-  ComputeAll = Logical true
-End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!  Stokes
-Solver 5
+!  Blatter-Pattyn
+Solver 4
   Equation = "1st Order Stokes"
   Procedure = "HydrostaticNSVec" "HydrostaticNSSolver"
   Variable = -dofs 2 "Horizontal Velocity"
@@ -190,7 +182,7 @@ End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Equation 1
-  Active Solvers(5) = 1 2 3 4 5
+  Active Solvers(4) = 1 2 3 4
 End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

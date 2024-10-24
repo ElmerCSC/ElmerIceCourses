@@ -115,7 +115,6 @@ Solver 1
   Variable 2 No Data Tol = Real 1.0 
 End 
 
-
 Solver 2  
   Equation = "MapCoordinate"
   Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
@@ -130,18 +129,9 @@ Solver 2
   Minimum Height = Real #MinH
 End
 
-Solver 3
-  Equation = "NormalVector" 
-  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
-  Variable = String "Normal Vector" 
-  Variable DOFs = 3
-  Optimize Bandwidth = Logical False 
-  ComputeAll = Logical true
-End
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  Stokes
-Solver 4
+Solver 3
   Equation = "Stokes-Vec"
   Procedure = "IncompressibleNSVec" "IncompressibleNSSolver"
   Div-Curl Discretization = Logical False
@@ -203,7 +193,7 @@ End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Equation 1
-  Active Solvers(4) = 1 2 3 4
+  Active Solvers(3) = 1 2 3
 End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -122,7 +122,6 @@ Solver 1
   Variable 2 No Data Tol = Real 1.0 
 End 
 
-
 Solver 2  
   Equation = "MapCoordinate"
   Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
@@ -137,18 +136,9 @@ Solver 2
   Minimum Height = Real #MinH
 End
 
-Solver 3
-  Equation = "NormalVector" 
-  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
-  Variable = String "Normal Vector" 
-  Variable DOFs = 3
-  Optimize Bandwidth = Logical False 
-  ComputeAll = Logical true
-End
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  Stokes
-Solver 4
+Solver 3
   Exec Solver = Never
   Equation = "Stokes-Vec"
   Procedure = "IncompressibleNSVec" "IncompressibleNSSolver"
@@ -211,7 +201,7 @@ End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Semilagrangian solver for advection dominated flow
-Solver 5
+Solver 4
   Equation = ParticleAdvector
   Procedure = "ParticleAdvector" "ParticleAdvector"
 
@@ -261,7 +251,7 @@ End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Equation 1
-  Active Solvers(5) = 1 2 3 4 5
+  Active Solvers(4) = 1 2 3 4
 End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
