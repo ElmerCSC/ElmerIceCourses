@@ -1,0 +1,13 @@
+! GCR+ILU0
+  Linear System Solver = Iterative
+  Linear System Iterative Method = "GCR"
+  Linear System GCR Restart = Integer 200
+  Linear System Convergence Tolerance = 1.0E-08
+! Solving for residual allows us to use sloppier tolerances
+! This seems to faster strategy.
+!  Linear System Residual Mode = True
+!  Linear System Convergence Tolerance = 1.0E-04 
+  Linear System Max Iterations = 500
+  Linear System Abort Not Converged = False
+  Linear System Preconditioning = "ILU1"
+  Linear System Residual Output = 10

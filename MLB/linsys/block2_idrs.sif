@@ -1,0 +1,40 @@
+  Linear System Solver = "Block"
+  Block Gauss-Seidel = Logical True
+  Block Matrix Reuse = Logical False
+  Block Scaling = Logical False
+  Block Preconditioner = Logical True
+! Default is [1 2 3 4]
+  Block Structure(4) = Integer 1 1 1 2
+!  Block Order(2) = Integer 1 2 
+
+! Linear System Scaling = False
+! Linear system solver for outer loop
+!-----------------------------------------
+  Linear System Residual Output = 25
+
+  Outer: Linear System Solver = "Iterative"
+  Outer: Linear System Iterative Method = GCR
+  Outer: Linear System GCR Restart =  250
+  Outer: Linear System Residual Output = 1
+  Outer: Linear System Max Iterations = 200
+  Outer: Linear System Abort Not Converged = False
+  Outer: Linear System Convergence Tolerance = 1e-8
+
+  $blocktol = 0.001
+
+  block 11: Linear System Convergence Tolerance = $blocktol
+  block 11: Linear System Solver = "iterative"
+  block 11: Linear System Scaling = false
+  block 11: Linear System Preconditioning = ilu0
+  block 11: Linear System Residual Output = 100
+  block 11: Linear System Max Iterations = 500
+  block 11: Linear System Iterative Method = idrs
+
+
+  block 22: Linear System Convergence Tolerance = $blocktol
+  block 22: Linear System Solver = "iterative"
+  block 22: Linear System Scaling = true
+  block 22: Linear System Preconditioning = ilu
+  block 22: Linear System Residual Output = 100
+  block 22: Linear System Max Iterations = 500
+  block 22: Linear System Iterative Method = idrs

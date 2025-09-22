@@ -1,0 +1,383 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Elmer Solver input file
+!!
+!! Vectorized Stokes solution for Midre Lovenbreen.
+!! Including Semi-Lagrangian dating solver.
+!!
+!! All units are in m-MPa-year
+!! Temperatures are in Kelvin
+!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! switch that on for debugging only
+! ---------------------------------
+! check keywords warn
+! echo on
+!!!!!!!!!!!!!!!!!!!!!!!!!
+! DEFINITIONS used in run
+!!!!!!!!!!!!!!!!!!!!!!!!!!
+$name="S_1995_DEMs_legacy_slipnl"
+
+! Note that the Mesh2MeshSolver requires solver specific
+! mesh and hence this must be different than primary mesh,
+! even symlink is ok.
+$restartdir="outline62_lc75"
+$restartfile="s_1995_dems_init_2d.result"
+
+$directmethod="mumps" !cPardiso"
+
+$yearinsec = 365.25*24*60*60
+$rhoi = 910.0/(1.0e6*yearinsec^2)   
+$gravity = -9.81*yearinsec^2
+
+$n = 3.0
+$m = 1.0/n
+
+! rate factors and molar activiation energies
+! after Paterson 2010
+$A1 = 2.89165e-13*yearinsec*1.0e18 
+$A2 = 2.42736e-02*yearinsec*1.0e18 
+$Q1 = 60.0e3
+$Q2 = 115.0e3
+
+! Temperature of the simulation in Celsius
+! with the formula for A works only if T > -10
+$Tc = -1.0
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! HEADER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Partitioned mesh
+Header
+  Mesh DB "." "outline62_lc75"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! CONSTANTS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Constants
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SIMULATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = "Cartesian 3D"
+  Simulation Type = "Steady State"             
+
+  ! Internal extrusion parameters, may be altered.
+  Extruded Mesh Levels = Integer 9 
+  Extruded Max Coordinate = Real 2000		
+
+  ! Coupled iterations between different solvers
+  !---------------------------------------------
+  Steady State Max Iterations = 1 
+  Steady State Min Iterations = 1
+
+  ! usually, Dirichlet BC's are initialized before everything else. Sometimes those 
+  ! conditions are dependent on solutions of earlier solvers; next line ensures that
+  ! this is not an issue.
+  !-----------------------------------------
+  Initialize Dirichlet Conditions = Logical False
+  
+  ! Output files
+  ! ------------
+  Post File = $name$.vtu
+  vtu: Save Bulk Only = Logical True
+
+  Scalars File = $name$.dat
+  scalars: Parallel Reduce = Logical True
+
+  Output File = $name$.result
+
+  ! Restart happens in Solver 1
+  Restart Before Initial Conditions = Logical True
+  Interpolation Passive Coordinate = Integer 3 
+
+  ! how verbose the solver should be
+  !  3 = Only warnings
+  ! 32 = Maximum verbosity
+  !-------------------------------------------------------
+  Max Output Level = 7
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SOLVER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Solver 1
+  Exec Solver = before all
+  Equation = "InterpSolver"
+
+! Perform the interpolation solver before all other solvers, only once.
+  Exec Solver = Before all
+  Procedure = "Mesh2MeshSolver" "Mesh2MeshSolver"
+
+  ! Restart is always in a serial mesh
+  Mesh = -single $restartdir
+  Restart File = $restartfile
+
+  ! We use the primary mesh an single process and unextruded
+  ! We want to have unique copy of it.   
+  Mesh Enforce Local Copy = Logical True
+
+  ! These are the variables for restart 
+  Restart Position = Integer 0
+  Restart Time = Real 2000.0
+  Restart Variable 1 = String "bedrockDEM"
+  Restart Variable 2 = String "surfaceDEM1995"
+
+! Continue even if some node is not found, deal with problems!
+  Restart Error Continue = Logical True  
+
+! These are the variables to be mapped from 2D ThisMesh to 3D TargetMesh'
+! All existing variables are automatically mapped. 
+!  Variable 1 = "bedrockDEM"
+!  Variable 2 = "surfaceDEM1995"
+
+! Ensures that we perform interpolation on plane 
+  Interpolation Passive Coordinate = Integer 3 
+End 
+
+
+! Maps the constant-thickness mesh between given bedrock and surface topology
+Solver 2 
+  Exec Solver = "before simulation"
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real 5.0
+
+  Correct Surface Mask = String "Glaciated"
+  Dot Product Tolerance = 1.0e-3
+
+  ! These are needed to host the variables that are read in
+  Variable = MeshUpdate
+
+  Exported Variable 1 = "bedrockDEM"
+  Exported Variable 1 Mask = String "BedRock"
+
+  Exported Variable 2 = "surfaceDEM1995"
+  Exported Variable 2 Mask = String "Surface"
+End
+
+
+! Computes height and depth assuming an extruded mesh.
+Solver 3 
+  Exec Solver = "before simulation" 
+  Equation = "HeightDepth"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+  Active Coordinate = Integer 3
+  Operator 1 = depth
+  Operator 2 = height
+End 
+
+Solver 4
+  Exec Solver = "Before Timestep" 
+  Equation = "Normal vector"
+  Procedure = "ElmerIceSolvers" "ComputeNormalSolver"
+  Variable = -dofs 3 "Normal Vector"
+  Optimize Bandwidth = Logical False
+  ComputeAll = Logical False
+End
+
+Solver 5
+  Equation = "Navier-Stokes"
+  Linear System Solver = Direct     
+  Linear System Direct Method = MUMPS!umfpack
+  Nonlinear System Max Iterations = Integer 50
+  Nonlinear System Convergence Tolerance  = 1.0e-5
+  !Nonlinear System Newton After Iterations = 5
+  !Nonlinear System Newton After Tolerance = 1.0e-02
+  Nonlinear System Relaxation Factor = $2/3
+  !Nonlinear System Reset Newton = Logical True
+    
+  Steady State Convergence Tolerance = Real 1.0e-4
+
+  Stabilization Method = String Stabilized
+
+  Flow Model = String "Stokes" ! comment, if you want to have acceleration terms
+! Some timing info
+  Boundary Assembly Timing = Logical True
+  Bulk Assembly Timing = Logical True
+  Solver Timing = Logical True
+  Linear System Timing = Logical True
+End
+
+! Semilagrangian solver for advection dominated flow
+Solver 6
+  !Exec Solver = "Never"
+  Equation = ParticleAdvector
+  Procedure = "ParticleAdvector" "ParticleAdvector"
+
+! Initialize particles at center of elements (as opposed to nodes)
+  Advect Elemental = Logical True
+
+!  Reinitialize Particles = Logical True
+!  Particle Accurate At Face = Logical False
+
+! Timestepping strategy
+  Simulation Timestep Sizes = Logical False
+  Particle Dt Constant = Logical False
+  Max Timestep Intervals = Integer 1000
+
+! Time in average 4 steps in each element 
+  Timestep Unisotropic Courant Number = Real 0.25
+  Max Timestep Size = Real 1.0e3
+
+! Give up integration if particles are tool old
+  Max Integration Time = Real 1.0e4
+
+! Integration forward in time
+  Runge Kutta = Logical False
+  Velocity Gradient Correction = Logical True
+  Velocity Variable Name = String "Flow Solution" 
+
+! Show some info in the end
+  Particle Info = Logical True
+  Particle Time = Logical True
+
+! The internal variables for this solver
+  Variable 1 = String "Particle Distance"
+  Variable 2 = String "Particle Time"
+  Operator 2 = String "Cumulative"
+
+! The field variables being advected
+  Variable 3 = String "Coordinate 1"
+  Result Variable 3 = String "Advected X"
+  Variable 4 = String "Coordinate 2"
+  Result Variable 4 = String "Advected Y"
+  Variable 5 = String "Coordinate 3"
+  Result Variable 5 = String "Advected Z"
+
+  Solver Timing = True
+End 
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODIES (i.e., domains to compute on)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Body 1
+  Name = "glacier"
+  Equation = 1
+  Material = 1
+  Body Force = 1
+  Initial Condition = 1
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! EQUATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(5) = 2 3 4 5 6
+  Convection = Computed 
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! INITIAL CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  ! Initial velocity is not really needed when using newtonian start
+  Velocity 1 = 0.0
+  Velocity 2 = 0.0
+  Velocity 3 = 0.0
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODY FORCE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = 0.0
+  Flow BodyForce 2 = 0.0 
+  Flow BodyForce 3 = $gravity
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! MATERIAL
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  Name = "Ice"
+  Density = Real $rhoi
+
+  ! First viscosity with newtonian fluid
+  ! happens to give velocities of proper size
+  Viscosity = Real 1.0 
+
+  ! Nonnewtonian viscosity
+  Viscosity Model = String "Glen"
+  Glen Exponent = Real 3.0
+  Critical Shear Rate =  Real 1.0E-10
+  ! Paterson value in MPa^-3a^-1
+  Limit Temperature = Real -10.0
+  Rate Factor 1 = Real $A1 
+  Rate Factor 2 = Real $A2 
+  Activation Energy 1 = Real $Q1    
+  Activation Energy 2 = Real $Q2 
+  Glen Enhancement Factor = Real 1.0
+  Constant Temperature = Real $Tc
+End
+
+Boundary Condition 1
+  ComputeNormal = Logical False
+  Name = "sides1"
+  Target Boundaries(1) = 1
+  ! no slip
+  !-------------------------
+  Velocity 1 = 0
+  Velocity 2 = 0
+  Velocity 3 = 0
+End
+
+Boundary Condition 2
+  ComputeNormal = Logical False
+  Name = "sides2"
+  Target Boundaries(1)  = 2
+  ! no slip
+  !-------------------------
+  Velocity 1 = 0
+  Velocity 2 = 0
+  Velocity 3 = 0
+End
+
+!! DON'T CHANGE ORDER OF NEXT 2 BC's!
+!! They are automaticaly created in internal extrusion
+!! bedrock:
+Boundary Condition 3
+  ComputeNormal = Logical True
+  Name = "bedrock"
+
+  Bottom Surface = Equals "bedrockDEM"
+  ComputeNormal = Logical True
+ 
+  ! Weertman sliding conditions
+  Normal-Tangential Velocity = True
+  Velocity 1 = Real 0.0
+  Slip Coefficient 2 =  Variable Coordinate 1
+    Real Procedure "ElmerIceUSF" "Sliding_Weertman"
+  Slip Coefficient 3 =  Variable Coordinate 1
+    Real Procedure "ElmerIceUSF" "Sliding_Weertman"
+  Weertman Friction Coefficient = Real 0.1
+  Weertman Exponent = Real $1.0/3.0
+  Weertman Linear Velocity = Real 0.00001
+  
+! Mask for creating the restart fields only where needed
+! Refererred by: Exported Variable 1 Mask = ...
+  Bedrock = Logical True
+End
+
+Boundary Condition 4
+  ComputeNormal = Logical False
+  Name = "surface"
+  Top Surface = Equals "surfaceDEM1995"
+
+! Referred by: Exported Variable 2 Mask = ...
+  Surface = Logical True  
+End

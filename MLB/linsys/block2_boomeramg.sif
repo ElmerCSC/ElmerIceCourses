@@ -1,0 +1,55 @@
+  Linear System Solver = "Block"
+  Block Gauss-Seidel = Logical True
+  Block Matrix Reuse = Logical False
+  Block Scaling = Logical False
+  Block Preconditioner = Logical True
+! Default is [1 2 3 4]
+  Block Structure(4) = Integer 1 1 1 2
+!  Block Order(2) = Integer 2 1
+  Block Scaling = False
+
+! Linear System Scaling = False
+! Linear system solver for outer loop
+!-----------------------------------------
+  Outer: Linear System Solver = "Iterative"
+  Outer: Linear System Iterative Method = GCR
+  Outer: Linear System GCR Restart =  250
+  Outer: Linear System Residual Output = 1
+  Outer: Linear System Max Iterations = 200
+  Outer: Linear System Abort Not Converged = False
+  Outer: Linear System Convergence Tolerance = 1e-8
+
+  $blocktol = 0.001
+
+! Hypre: FlexGmres + BoomerAMG for velocity
+!  Linear System Row Equilibration = Logical True
+
+  block 11: Linear System Iterative = Logical True
+  block 11: Linear System Use HYPRE = Logical True
+  block 11: Linear System Scaling = Logical False
+!  block 11: Linear System Row Equilibration = Logical True
+
+  block 11: Linear System Iterative Method = BoomerAMG !FlexGmres
+!  block 11: Hypre GMRES dimension = Integer 50
+  block 11: Linear System Max Iterations = 1000
+  block 11: Linear System Convergence Tolerance = $blocktol
+!  block 11: Linear System Preconditioning = boomeramg
+  block 11: HYPRE Block Diagonal = Logical True
+
+  BoomerAMG Relax Type = Integer 3
+  BoomerAMG Coarsen Type = Integer 0
+  BoomerAMG Num Sweeps = Integer 1
+  Boomeramg Max Levels = Integer 25
+  BoomerAMG Interpolation Type = Integer 0
+  BoomerAMG Smooth Type = Integer 6
+  BoomerAMG Cycle Type = Integer 1
+  BoomerAMG Num Functions = Integer 3
+  BoomerAMG Strong Threshold = Real 0.85
+
+  block 22: Linear System Convergence Tolerance = $blocktol
+  block 22: Linear System Solver = "iterative"
+  block 22: Linear System Scaling = false
+  block 22: Linear System Preconditioning = ilu
+  block 22: Linear System Residual Output = 1
+  block 22: Linear System Max Iterations = 500
+  block 22: Linear System Iterative Method = idrs

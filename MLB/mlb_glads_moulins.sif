@@ -1,0 +1,631 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! Elmer Solver input file
+!!
+!! Vectorized Stokes solution for Midre Lovenbreen.
+!! Including Semi-Lagrangian dating solver.
+!!
+!! All units are in m-MPa-year
+!! Temperatures are in Kelvin
+!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! switch that on for debugging only
+! ---------------------------------
+! check keywords warn
+! echo on
+!!!!!!!!!!!!!!!!!!!!!!!!!
+! DEFINITIONS used in run
+!!!!!!!!!!!!!!!!!!!!!!!!!!
+$name="S_1995_DEMs_glads_moulin"
+$meshfile="outline62_lc75"
+$element="p:1 b:1"
+#MINH=20.0
+#Tc = -1.0
+#directmethod="mumps"
+
+#dt=3600*4
+#output=6
+#tsteps=100*6
+
+!---LUA BEGIN
+! assert(loadfile('./icematerial_SI.lua'))()
+! assert(loadfile('./glads.lua'))()
+!---LUA END
+
+
+!echo on
+
+! Note that the Mesh2MeshSolver requires solver specific
+! mesh and hence this must be different than primary mesh,
+! even symlink is ok.
+$restartdir="outline62_lc75"
+$restartfile="s_1995_dems_tmc_loads_si.result"
+!s_1995_dems_glads_init.result
+
+
+
+
+
+! Temperature of the simulation in Celsius
+! with the formula for A works only if T > -10
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! HEADER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Partitioned mesh
+Header
+  Mesh DB "." "$meshfile$"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! CONSTANTS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Constants
+Gravity(4) = 0 0 1 #gravity
+! GlaDS
+  Latent Heat = Real #Lw
+  Gravity Norm = Real #-gravity
+  Fresh Water Density = Real #rhow
+  Water Density = Real #rhow
+  Ice Density = Real #rhoi
+  Sheet Thickness Variable Name = String "Sheet Thickness"
+  Hydraulic Potential Variable Name = String "Hydraulic Potential"
+  Channel Area Variable Name = String "Channel Area"
+  Bedrock Variable Name = String "bedrockDEM"
+End
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SIMULATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Simulation
+  Coordinate System  = "Cartesian 3D"
+  Simulation Type = "Transient"
+  
+  Timestepping Method = "bdf"
+  BDF Order = 1
+  Timestep Intervals(1) = #tsteps
+  Timestep Sizes(1) = #dt
+  Output Intervals(1) = #output
+  !Timestep Size = Variable Timestep
+  !   Real LUA "settimestepsize(tx[0])"
+
+  ! Internal extrusion parameters:
+  Extruded Mesh Levels = Integer 9 
+  Extruded Max Coordinate = Real 1.0	
+  Preserve Baseline = Logical True	
+
+  ! Coupled iterations between different solvers
+  !---------------------------------------------
+  Steady State Max Iterations = 1
+  Steady State Min Iterations = 1
+
+  ! usually, Dirichlet BC's are initialized before everything else. Sometimes those 
+  ! conditions are dependent on solutions of earlier solvers; next line ensures that
+  ! this is not an issue.
+  !-----------------------------------------
+  Initialize Dirichlet Conditions = Logical False
+  
+  ! Output files
+  ! ------------
+  Post File = $name$.vtu
+  !vtu: Save Bulk Only = Logical True
+
+  !Scalars File = $name$.dat
+  !scalars: Parallel Reduce = Logical True
+
+  Output File = $name$.result
+
+  ! Restart happens in Solver 1
+  Restart Before Initial Conditions = Logical True
+  !Interpolation Passive Coordinate = Integer 3 
+
+  ! how verbose the solver should be
+  !  3 = Only warnings
+  ! 32 = Maximum verbosity
+  !-------------------------------------------------------
+  Max Output Level = 5
+
+  Restart Variable 1 = bedrockdem
+  Restart Variable 2 = surfacedem1995
+  Restart Variable 3 = velocity
+  Restart Variable 4 = pressure
+  Restart Variable 5 = flow solution loads
+  Restart Variable 6 = temperature
+  Restart Variable 7 = temperature boundary weights
+  Restart Variable 8 = temperature contact loads
+  Restart Variable 9 = relative temperature
+  Restart Variable 10 = temperature contact active
+  Restart Variable 11 = glaciated
+  Restart Variable 12 = depth
+  Restart Variable 13 = height
+
+  Restart File = File "$restartfile$"
+  Restart Position = 0
+  Restart Time = 0.0
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SOLVER
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+! Maps the constant-thickness mesh between given bedrock and surface topology
+Solver 1
+  Exec Solver = "before simulation"
+  Equation = "MapCoordinate"
+  Procedure = "StructuredMeshMapper" "StructuredMeshMapper"
+
+  Active Coordinate = Integer 3
+
+  Displacement Mode = Logical False
+  Correct Surface = Logical True
+  Minimum Height = Real #MINH
+
+  Correct Surface Mask = String "Glaciated"
+  Dot Product Tolerance = 1.0e-3
+
+  ! These are needed to host the variables that are read in
+  Variable = -nooutput "DummyMesh"
+
+  Exported Variable 1 = "bedrockDEM"
+  !Exported Variable 1 Mask = String "BedRock"
+
+  Exported Variable 2 = "surfaceDEM1995"
+  !Exported Variable 2 Mask = String "Surface"
+End
+
+
+! Computes height and depth assuming an extruded mesh.
+Solver 2 
+  Exec Solver = "before simulation" 
+  Equation = "HeightDepth"
+  Procedure = "StructuredProjectToPlane" "StructuredProjectToPlane"
+  Active Coordinate = Integer 3
+  Operator 1 = depth
+  Operator 2 = height
+End 
+
+
+! vectorized & threaded version of the Navier-Stokes solver.
+Solver 3
+  Exec Solver = "Never"
+  Equation = "Stokes-Vec"
+  Procedure = "IncompressibleNSVec" "IncompressibleNSSolver"
+  Div-Curl Discretization = Logical False
+
+  Optimize Bandwidth = Logical True
+  Flow Model = Stokes
+  Stabilization Method = String Stabilized
+
+  !Non-linear iteration settings:
+  !------------------------------ 
+  Nonlinear System Max Iterations = 100
+  Nonlinear System Convergence Tolerance  = 1.0e-5
+  Nonlinear System Newton After Iterations = 10
+  Nonlinear System Newton After Tolerance = 1.0e-1
+  ! Nonlinear System Relaxation Factor = 1.00
+  ! Nonlinear System Reset Newton = Logical True
+
+  include linsys/gcr.sif
+
+  ! Convergence on timelevel (not required here)
+  !---------------------------------------------
+  Steady State Convergence Tolerance = Real 1.0e-3
+
+  !Relative Integration Order = -1
+  Number of Integration Points = Integer 44 ! 21, 28, 44, 64, ...
+
+  ! 1st iteration viscosity is constant
+  Constant-Viscosity Start = Logical True
+
+! Some timing info
+  !Boundary Assembly Timing = Logical True
+  !Bulk Assembly Timing = Logical True
+  !Solver Timing = Logical True
+  !Linear System Timing = Logical True
+  Calculate Loads = True
+  !Calculate Weights = True
+  Calculate Boundary Weights = True
+
+  Exported Variable 1 = -dofs 4 Flow Solution Loads
+!  Exported Variable 2 = Flow Solution Boundary Weights
+End
+
+!-----------------------------------------------------
+! heat transfer limited by the pressure melting point
+! as upper limit
+!-----------------------------------------------------
+Solver 4
+  Exec Solver = "Never"
+  Equation = String "Homologous Temperature Equation"
+  Procedure =  File "HeatSolveVec" "HeatSolver"
+  ! Comment next line in parallel, as EliminateDirichlet does
+  ! not work in parallel
+  !------------------------------------------------------------
+!  Before Linsolve = "EliminateDirichlet" "EliminateDirichlet"
+  Variable = String "Temperature"
+  Variable DOFs = 1
+  Stabilization method = Stabilized
+  Stabilize = True
+  Optimize Bandwidth = Logical True
+ ! Linear System Solver = "Direct"
+ ! Linear System Direct Method = #directsolver
+  Linear System Solver = "Iterative"
+  Linear System Iterative Method = "GCR"
+  Linear System Max Iterations = 500
+  Linear System Convergence Tolerance = 1.0E-08
+  Linear System Abort Not Converged = True
+  Linear System Preconditioning = "ILU1"
+  Linear System Residual Output = 1
+  Nonlinear System Convergence Tolerance = 1.0E-04
+  Nonlinear System Max Iterations = 50
+  !Nonlinear System Relaxation Factor = Real 9.999E-01
+  Steady State Convergence Tolerance = 1.0E-03
+  !Steady State Relaxation Factor = Real #1.0/3.0
+  ! the contact algorithm (aka Dirichlet algorithm)
+  !-----------------------------------------------------
+  Apply Limiter = Logical True
+  Calculate Loads = Logical True
+    Save Limiter = Logical True
+  Calculate Boundary Weights = Logical True
+  ! those two variables are needed in order to store
+  ! the relative or homologous temperature as well
+  ! as the residual
+  !-------------------------------------------------
+  Exported Variable 1 = -dofs 1 "Relative Temperature"
+!  Exported Variable 2 = -dofs 1 "Temperature Loads"
+!  Exported Variable 3 = -dofs 1 "Temperature Boundary Weights"
+  Exported Variable 2 = -dofs 1 "Friction Loads"
+  Nonlinear Update Exported Variables = Logical True
+  Update Exported Variables = Logical True
+End
+
+Solver 5
+  Equation = "Moulin Mask Init"
+  Exec Solver = "Before Simulation"
+  Procedure = "SetMoulinMask" "SetMoulinMask"
+  Variable = -dofs 1 "Moulin Mask"
+  Moulin Filename = File "./moulinpositions.txt"
+End
+
+Solver 6
+  !Exec Solver = Never
+  Equation = "Moulin Flux Init"
+  Exec Solver = "Before Timestep"
+  Procedure = "SetMoulinFlux" "SetMoulinFlux"
+  Variable = -dofs 1 "Moulin Flux"
+  Moulin Flux Scale Factor = Real #10.0
+  Moulin Flux Filename = File "moulinfluxes.txt"
+End
+
+Solver 7
+  Equation = "GlaDS Coupled sheet"
+  !Exec Solver = "never"
+  Procedure = "ElmerIceSolvers" "GlaDSCoupledSolver"
+  
+  Variable = -dofs 1 "Hydraulic Potential"
+  
+  Have Moulin Mask = Logical True
+  
+  Use GroundedMask = Logical True
+  Zero Sheet At GL = Logical False
+  
+  Activate Channels = Logical True ! True
+  Activate Melt from Channels = Logical False !True
+  Neglect Sheet Thickness in Potential = Logical True
+
+  !Limit Negative Effective Pressure = Logical False ! default
+  Max Channel Area = Real 20.0
+  Max Sheet Thickness = Real 10.0
+
+  ! choices are EXPLICIT, CRANK-NICOLSON, IMPLICIT
+  Channels Integration method = String "Crank-Nicolson"
+  Sheet Integration method = String "Crank-Nicolson"
+
+  Exported Variable 1 = -dofs 1 "Vclose"
+  Exported Variable 2 = -dofs 1 "Wopen"
+  Exported Variable 3 = -dofs 1 "Normal Stress"
+  Exported Variable 4 = -dofs 1 "Water Pressure"
+  Exported Variable 5 = -dofs 1 "Effective Pressure"
+  Exported Variable 6 = -dofs 2 "Sheet Discharge"
+  Exported Variable 7 = -dofs 1 "Sheet Storage"
+  !Exported Variable 8 = -dofs 1 "Flux from Moulins"
+
+  Linear System Solver = Direct     
+
+  !Replace UMFPACK with MUMPS IF you are using
+  !multiple partitions 
+  Linear System Direct Method = UMFPACK
+
+  Nonlinear System Max Iterations = 20
+  Nonlinear System Convergence Tolerance  = 1.0e-6 !1.0e-6
+  Nonlinear System Relaxation Factor = 1.00
+
+  Coupled Max Iterations = Integer 40
+  Coupled Convergence Tolerance = Real 1.0e-3
+
+  Steady State Convergence Tolerance = 1.0e-03
+  !Bubbles in global system = False
+End
+
+Solver 8
+  ! Just here to declare the variable Sheet Thickness
+  Equation = "GlaDS Thickness sheet"
+  Exec Solver = "Before timestep"
+  !Exec Solver = "Never"
+  Procedure = "ElmerIceSolvers" "GlaDSsheetThickDummy"
+  Variable = -dofs 1 "Sheet Thickness"
+  Exported Variable 1 = -dofs 1 "Meltrate"
+
+  Nonlinear Update Exported Variables = Logical True
+  Update Exported Variables = Logical True
+
+  !Bubbles in global system = False
+End
+
+Solver 9
+  ! Just here for output and declare the Channel Area variable
+  ! It is executed simultaneously to saving
+  Exec Solver = After Timestep
+  !Exec Solver = "never"
+  Equation = "GlaDS Channel OutPut"
+  Exec Interval = #output
+  Procedure = "ElmerIceSolvers" "GlaDSchannelOut"
+  Variable = -dofs 1 "Channel Area"
+! Define that the variable is define on the edges only
+  Element = "n:0 e:1"
+  
+  Exported Variable 1 = -dofs 1 "Channel Flux"
+
+  VTU OutPutFile = Logical True 
+  VTU BinaryFile = Logical False
+
+  Channels OutPut Directory Name = File "$meshfile$/channels"
+  Channels OutPut File Name = String "$name$_channels"
+  !Bubbles in global system = False
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODIES (i.e., domains to compute on)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Body 1
+  Name = "glacier"
+  Equation = 1
+  Material = 1
+  Body Force = 1
+  Initial Condition = 1
+End
+
+
+Body 2
+  Name= "bedrock interface"
+  Equation = 2
+  Material = 1
+  Initial Condition = 2
+  Body Force = 2
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! EQUATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Equation 1
+  Active Solvers(4) = 1 2 3 4 
+  Convection = "Computed"
+  Flow Solution Name = String "Flow Solution"
+End
+Equation 2
+  Name = "interface equations"
+  Active Solvers(5) =  5 6 7 8 9
+  Convection = "Computed"
+  Flow Solution Name = String "Flow Solution"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! INITIAL CONDITIONS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Initial Condition 1
+  ! Initial velocity is not really needed when using newtonian start
+End
+
+Initial Condition 2
+  ! Initial velocity is not really needed when using newtonian start
+   Sheet Thickness = Real #Hs
+   Hydraulic Potential = Variable Coordinate 3, Depth
+     Real Lua "-rhow*gravity*(tx[0] + 0.95*tx[1])"
+End
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! BODY FORCE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Body Force 1
+  Flow BodyForce 1 = 0.0
+  Flow BodyForce 2 = 0.0 
+  Flow BodyForce 3 = #gravity
+  Temperature Upper Limit = Real 273.15
+  Temperature = Real 273.15
+  Temperature Condition =Variable Coordinate 3 
+      Real
+            0.0      -1.0
+	  399.9999   -1.0
+	  400.        1.0
+         1000.0       1.0
+      End
+  Relative Temperature = Variable Temperature
+     Real Lua "min(tx[0] - 273.15, 0.0)"
+ End  
+ 
+Body Force 2
+  Channel Area = Real 0.0
+  Channel Area Condition = Opposes glaciated
+  Channel Flux = Real 0.0
+  Channel Flux Condition = Opposes glaciated
+  Channel Area Passive = Opposes glaciated
+  Channel Flux Passive = Opposes glaciated
+  Hydraulic Potential = Variable Coordinate 3
+     Real Lua "-rhow*gravity*tx[0]"
+  Hydraulic Potential Condition = Opposes glaciated
+  !Hydraulic Potential Passive = Opposes glaciated
+  Sheet Thickness = Real 0.001
+  Sheet Thickness Condition = Opposes glaciated
+  Hydraulic Potential Volume Source = Variable "temperature contact load", "temperature boundary weights", "temperature contact active"
+    Real LUA "getmeltrate(tx[0],tx[1],tx[2]) + Source*tx[2]"
+  Meltrate =  Variable "temperature contact load", "temperature boundary weights", "temperature contact active"
+    Real LUA "getmeltrate(tx[0],tx[1],tx[2]) + Source*tx[2]"
+End
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! MATERIAL
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Material 1
+  Name = "Ice"
+  Density = Real #rhoi
+
+  ! First viscosity with newtonian fluid
+  ! happens to give velocities of proper size
+  Viscosity = Real 1.0E+15 
+
+  ! Nonnewtonian viscosity
+  Viscosity Model = String Glen
+  Glen Exponent = Real 3.0
+  Critical Shear Rate =  Real 1.0E-16
+  ! Paterson value in MPa^-3a^-1
+  Limit Temperature = Real -10.0
+  ! those are already transferred to Mpa-m-a system
+  Rate Factor 1 = Real #A1 
+  Rate Factor 2 = Real #A2 
+  Activation Energy 1 = Real #Q1    
+  Activation Energy 2 = Real #Q2
+  !------------------------------------
+  Glen Enhancement Factor = Real 1.0
+  Relative Temperature = Variable Temperature
+    Real lua "tx[0] - 273.15"
+    
+  ! Heat transfer stuff
+  Heat Capacity = Variable Temperature
+    Real lua "capacity(tx[0])"
+  Heat Conductivity = Variable Temperature
+    Real lua "conductivity(tx[0])"
+    
+  Pressure Scaling Factor = Real 1.0
+  Temperature Upper Limit = Real 273.15 ! we ignore pressure melting point
+
+  ! GlaDS
+  ! For the sheet 
+  Sheet Conductivity = Real #Ks 
+  Sheet flow exponent alpha = Real #alphas
+  Sheet flow exponent beta = Real #betas
+  Englacial Void Ratio = Real #ev       
+
+  Sliding Velocity = Variable Velocity 1, Velocity 2, Velocity 3, glaciated
+     Real LUA "math.sqrt(tx[0]*tx[0] + tx[1]*tx[1] + tx[2]*tx[2])*0.5*(tx[3] + 1.0)"
+
+  Bedrock Bump Length = Real #lr
+  Bedrock Bump High = Real #hr
+  Sheet Closure Coefficient = Variable "Relative Temperature"
+     Real Lua "arrhenius(tx[0])"
+     
+! For the Channels
+  ! almost no conductivity in deglaciated area
+  Channel Conductivity = Variable Glaciated
+      Real LUA "Kc*(0.99*(1 + tx[0])*0.5 + 0.01)"
+  Channel flow exponent alpha = Real #alphac
+  Channel flow exponent beta = Real #betac 
+  Channel Closure Coefficient = Variable "Relative Temperature"
+     Real Lua "arrhenius(tx[0])"
+  Sheet Width Over Channel = Real #lc
+  Pressure Melting Coefficient = Real #Ct
+  Water Heat Capacity = Real #Cw
+
+! For both
+  Ice Normal Stress = Variable depth
+     Real Lua "-rhoi*gravity*tx[0]"
+End
+!---------------------------------------------------
+!---------------- BOUNDARY CONDITIONS --------------
+!---------------------------------------------------
+Boundary Condition 1
+  ComputeNormal = Logical False
+  Name = "sideline"
+  Target Boundaries(1) = 1
+  ! no slip
+  !-------------------------
+  Velocity 1 = 0
+  Velocity 2 = 0
+  Velocity 3 = 0
+  No Channel BC = Logical True
+  Hydraulic Potential = Real 0.0
+End
+
+Boundary Condition 2
+  ComputeNormal = Logical False
+  Name = "sidesline2"
+  Target Boundaries(1)  = 2
+  ! no slip
+  !-------------------------
+  Velocity 1 = 0
+  Velocity 2 = 0
+  Velocity 3 = 0
+  No Channel BC = Logical True
+  Hydraulic Potential =  Real 0.0
+End
+
+Boundary Condition 3
+  Name="side rock1"
+  Target Boundaries(1) = 3
+End
+
+Boundary Condition 4
+  Name="side rock1"
+  Target Boundaries(1) = 3
+End
+
+!! DON'T CHANGE ORDER OF NEXT 2 BC's!
+!! They are automaticaly created in internal extrusion
+!! bedrock:
+Boundary Condition 5
+  ComputeNormal = Logical True
+  Name = "bedrock"
+  Body ID = 2
+  ! No-slip velocity conditions
+  !Velocity 1 = Real 0.0
+  !Velocity 2 = Real 0.0
+  !Velocity 3 = Real 0.0
+
+  ! slip conditions
+  Normal-Tangential Velocity = True
+  Velocity 1 = Real 0.0
+  Weertman Friction Coefficient = Real #0.1*(Pa2MPa^(-1))*yearinsec^(1.0/3.0)
+  Weertman Exponent = Real #1.0/3.0
+  Weertman Linear Velocity = Real 1.0E-10
+  Friction Newton Epsilon = Real 1.0E-03
+  Friction Newton Linearization = Logical True
+
+
+  Bottom Surface = Equals "bedrockDEM"
+
+! Mask for creating the restart fields only where needed
+! Refererred by: Exported Variable 1 Mask = ...
+  Bedrock = Logical True
+  Temperature Flux BC = Logical True
+  Heat Flux = Real #0.050 
+  ! 50 mW m^-2
+  Friction Loads = Variable "Flow Solution Loads 1",  "Flow Solution Loads 2",  "Flow Solution Loads 3", Velocity 1, Velocity 2, Velocity 3
+    Real Lua "frictionloads(tx[0],tx[1],tx[2],tx[3],tx[4],tx[5])"
+  Temperature Load = Variable "Flow Solution Loads 1",  "Flow Solution Loads 2",  "Flow Solution Loads 3", Velocity 1, Velocity 2, Velocity 3
+    Real Lua "frictionloads(tx[0],tx[1],tx[2],tx[3],tx[4],tx[5])"
+  Calculate Temperature Boundary Weights = Logical True
+End
+
+Boundary Condition 6
+  ComputeNormal = Logical False
+  Name = "surface"
+  Top Surface = Equals "surfaceDEM1995"
+
+! Referred by: Exported Variable 2 Mask = ...
+  Surface = Logical True
+  Temperature = Variable Coordinate 3 ! lapserate of -10/1000 C/m
+      Real
+            0.0   272.15
+	  100.0   272.14
+         1000.0   263.15
+      End 
+End

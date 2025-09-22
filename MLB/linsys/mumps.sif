@@ -1,0 +1,3 @@
+! Direct method with mumps (1 or several processes)
+  Linear System Solver = Direct
+  Linear System Direct Method = mumps
