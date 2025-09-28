@@ -181,7 +181,7 @@ End
 Solver 4
   Equation = "Navier-Stokes"
   Linear System Solver = Direct     
-  Linear System Direct Method = MUMPS!umfpack
+  Linear System Direct Method = UMFPACK
   Nonlinear System Max Iterations = Integer 50
   Nonlinear System Convergence Tolerance  = 1.0e-5
   Nonlinear System Newton After Iterations = 5

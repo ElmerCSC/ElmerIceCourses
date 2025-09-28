@@ -42,6 +42,7 @@ cd /home/ubuntu/ElmerDependencies
 git clone  https://github.com/MmgTools/mmg.git
 cd mmg
 git checkout develop
+git checkout f09cee88
 #git reset --hard 565d6849
 echo "#############################"
 echo "#############################"

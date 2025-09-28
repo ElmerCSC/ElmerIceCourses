@@ -188,7 +188,7 @@ End
 Solver 5
   Equation = "Navier-Stokes"
   Linear System Solver = Direct     
-  Linear System Direct Method = MUMPS!umfpack
+  Linear System Direct Method = UMFPACK
   Nonlinear System Max Iterations = Integer 50
   Nonlinear System Convergence Tolerance  = 1.0e-5
   !Nonlinear System Newton After Iterations = 5
@@ -309,7 +309,7 @@ Material 1
 
   ! First viscosity with newtonian fluid
   ! happens to give velocities of proper size
-  Viscosity = Real 1.0 
+  Viscosity = Real 10.0 
 
   ! Nonnewtonian viscosity
   Viscosity Model = String "Glen"

@@ -12,7 +12,7 @@
 ! ---------------------------------
 ! check keywords warn
 ! echo on
-!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!+
 ! DEFINITIONS used in run
 !!!!!!!!!!!!!!!!!!!!!!!!!!
 $name="S_1995_DEMs_glads_moulin"
@@ -553,7 +553,7 @@ Boundary Condition 1
   Velocity 2 = 0
   Velocity 3 = 0
   No Channel BC = Logical True
-  Hydraulic Potential = Real 0.0
+  !Hydraulic Potential = Real 0.0
 End
 
 Boundary Condition 2
@@ -566,7 +566,7 @@ Boundary Condition 2
   Velocity 2 = 0
   Velocity 3 = 0
   No Channel BC = Logical True
-  Hydraulic Potential =  Real 0.0
+  !Hydraulic Potential =  Real 0.0
 End
 
 Boundary Condition 3

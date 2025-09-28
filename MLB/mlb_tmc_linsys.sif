@@ -143,7 +143,7 @@ Solver 2
 
   Displacement Mode = Logical False
   Correct Surface = Logical True
-  Minimum Height = Real #MINH
+  Minimum Height = Real 5.0
 
   Correct Surface Mask = String "Glaciated"
   Dot Product Tolerance = 1.0e-3
@@ -152,10 +152,10 @@ Solver 2
   Variable = -nooutput "DummyMesh"
 
   Exported Variable 1 = "bedrockDEM"
-  !Exported Variable 1 Mask = String "BedRock"
+  Exported Variable 1 Mask = String "BedRock"
 
   Exported Variable 2 = "surfaceDEM1995"
-  !Exported Variable 2 Mask = String "Surface"
+  Exported Variable 2 Mask = String "Surface"
 End
 
 
