@@ -207,7 +207,7 @@ Solver 3
   !Linear System Timing = Logical True
   Calculate Loads = True
   !Calculate Weights = True
-  Calculate Boundary Weights = True
+  !Calculate Boundary Weights = True
 
   Exported Variable 1 = -dofs 4 Flow Solution Loads
 !  Exported Variable 2 = Flow Solution Boundary Weights

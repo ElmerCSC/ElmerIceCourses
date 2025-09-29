@@ -84,7 +84,7 @@ Simulation
   ! Output files
   ! ------------
   Post File = $name$.vtu
-  vtu: Save Bulk Only = Logical True
+  !vtu: Save Bulk Only = Logical True
 
   Scalars File = $name$.dat
   scalars: Parallel Reduce = Logical True
@@ -124,7 +124,7 @@ Solver 1
 
   ! These are the variables for restart 
   Restart Position = Integer 0
-  Restart Time = Real 2000.0
+  Restart Time = Real 1994.0 ! a trick to yield 1995 as result-time
   Restart Variable 1 = String "bedrockDEM"
   Restart Variable 2 = String "surfaceDEM1995"
 

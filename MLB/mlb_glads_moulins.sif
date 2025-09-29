@@ -302,8 +302,8 @@ End
 Solver 7
   Equation = "GlaDS Coupled sheet"
   !Exec Solver = "never"
-  !Procedure = "ElmerIceSolvers" "GlaDSCoupledSolver"
-  Procedure = "MyGlaDSCoupledSolver.so"  "GlaDSCoupledSolver"
+  Procedure = "ElmerIceSolvers" "GlaDSCoupledSolver"
+  !Procedure = "MyGlaDSCoupledSolver.so"  "GlaDSCoupledSolver"
 
   Variable = -dofs 1 "Hydraulic Potential"
   

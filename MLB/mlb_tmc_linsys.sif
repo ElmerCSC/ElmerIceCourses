@@ -149,7 +149,7 @@ Solver 2
   Dot Product Tolerance = 1.0e-3
 
   ! These are needed to host the variables that are read in
-  Variable = -nooutput "DummyMesh"
+  Variable = MeshUpdate
 
   Exported Variable 1 = "bedrockDEM"
   Exported Variable 1 Mask = String "BedRock"
@@ -209,7 +209,7 @@ Solver 4
   !Linear System Timing = Logical True
   Calculate Loads = True
   !Calculate Weights = True
-  Calculate Boundary Weights = True
+  !Calculate Boundary Weights = True
 
   Exported Variable 1 = -dofs 4 Flow Solution Loads
 !  Exported Variable 2 = Flow Solution Boundary Weights
@@ -285,7 +285,7 @@ End
 ! EQUATION
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Equation 1
-  Active Solvers(5) = 1 2 3 4 5
+  Active Solvers(4) =  2 3 4 5
   Convection = "Computed"
   Flow Solution Name = String "Flow Solution"
 End

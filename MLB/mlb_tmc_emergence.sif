@@ -29,7 +29,7 @@ $name="S_1995_DEMs_emergence"
 ! Note that the Mesh2MeshSolver requires solver specific
 ! mesh and hence this must be different than primary mesh,
 ! even symlink is ok.
-$restartdir="outline62_lc50"
+$restartdir="outline62_lc75"
 $restartfile="s_1995_dems_init_2d.result"
 
 
@@ -39,7 +39,7 @@ $restartfile="s_1995_dems_init_2d.result"
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Partitioned mesh
 Header
-  Mesh DB "." "outline62_lc50"
+  Mesh DB "." "outline62_lc75"
 End
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -209,7 +209,7 @@ Solver 4
   !Linear System Timing = Logical True
   Calculate Loads = True
   !Calculate Weights = True
-  Calculate Boundary Weights = True
+  !Calculate Boundary Weights = True
 
   Exported Variable 1 = -dofs 4 Flow Solution Loads
 !  Exported Variable 2 = Flow Solution Boundary Weights
